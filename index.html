@@ -81,12 +81,19 @@
   .total { font-family: var(--num); font-weight: 700; font-size: clamp(52px, 15vw, 76px); line-height: 1; letter-spacing: -.5px; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
   .total small { font-size: .4em; font-weight: 600; color: var(--muted); margin-right: 6px; letter-spacing: 0; }
   .meta { color: var(--muted); font-size: 14px; }
-  .bars { margin-top: 20px; border-top: 1px dashed var(--line); padding-top: 16px; display: grid; gap: 10px; }
-  .bar { display: grid; grid-template-columns: 80px 1fr auto; align-items: center; gap: 10px; background: none; border: 0; padding: 2px 0; text-align: left; width: 100%; }
+  .chart { margin-top: 20px; border-top: 1px dashed var(--line); padding-top: 20px; display: grid; gap: 18px; }
+  .donut { width: 180px; height: 180px; justify-self: center; display: block; }
+  .donut circle.seg { cursor: pointer; transition: opacity .15s; }
+  .donut circle.seg.dim { opacity: .25; }
+  .donut .c-name { font: 500 13px var(--text); fill: var(--muted); }
+  .donut .c-pct { font: 700 30px var(--num); fill: var(--ink); }
+  .bars { display: grid; gap: 10px; }
+  .bar { display: grid; grid-template-columns: 72px 1fr auto; align-items: center; gap: 10px; background: none; border: 0; padding: 2px 0; text-align: left; width: 100%; }
   .bar-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bar-track { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 4px; }
-  .bar-amt { font-family: var(--num); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+  .bar-fill { display: block; height: 100%; border-radius: 4px; }
+  .bar-pct { color: var(--muted); font-size: 13px; font-family: var(--num); margin-left: 4px; }
+  .bar-amt { font-family: var(--num); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 96px; text-align: right; }
   .bar.dim { opacity: .35; }
 
   /* 消費清單 */
@@ -147,7 +154,7 @@
     opacity: 0; transition: opacity .2s; pointer-events: none;
   }
   .toast.show { opacity: 1; }
-  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .toast, .donut circle.seg { transition: none; } }
 </style>
 </head>
 <body>
@@ -175,7 +182,10 @@
     <div class="receipt-label">本期支出</div>
     <div class="total"><small>NT$</small><span id="total">0</span></div>
     <div class="meta" id="meta"></div>
-    <div class="bars" id="bars"></div>
+    <div class="chart" id="chart">
+      <svg class="donut" id="donut" viewBox="0 0 180 180" role="img" aria-label="各分類支出比例"></svg>
+      <div class="bars" id="bars"></div>
+    </div>
   </section>
 
   <div class="filter-note hidden" id="filterNote">
@@ -209,15 +219,26 @@
 <dialog id="dlgMenu">
   <div class="dlg">
     <h3 id="menuName"></h3>
-    <div class="info">
-      你的使用者 ID（設定 Apps Script 自動匯入時需要）
-      <div class="uid" id="uidText"></div>
-    </div>
     <div class="menu-list">
-      <button class="btn-ghost" id="btnCopyUid">複製使用者 ID</button>
+      <button class="btn-ghost" id="btnKey">複製自動匯入金鑰</button>
       <button class="btn-ghost" id="btnExport">匯出本期 CSV（Excel 可開）</button>
       <button class="btn-ghost" id="btnLogout">登出</button>
       <button class="btn-ghost" id="btnCloseMenu">關閉</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgKey">
+  <div class="dlg">
+    <h3>自動匯入金鑰</h3>
+    <div class="info">
+      把這串金鑰貼到 Apps Script 的 IMPORT_KEY，刷卡通知信就會自動匯入你的記帳本。
+      金鑰等同你的記帳密碼：拿到的人可以讀寫你的記帳資料，請不要傳給別人或貼到公開的地方。
+    </div>
+    <div class="field"><label for="keyText">金鑰</label><input id="keyText" readonly></div>
+    <div class="dlg-actions">
+      <button class="btn-ghost" id="btnKeyClose">關閉</button>
+      <button class="btn-primary" id="btnKeyCopy">複製金鑰</button>
     </div>
   </div>
 </dialog>
@@ -307,7 +328,6 @@ onAuthStateChanged(auth, u => {
   if (u) {
     $("avatarImg").src = u.photoURL || "";
     $("menuName").textContent = u.displayName || u.email;
-    $("uidText").textContent = u.uid;
     subscribe();
   } else if (unsub) { unsub(); unsub = null; }
 });
@@ -354,12 +374,13 @@ function render() {
   twd.forEach(t => { const c = t.category || UNCAT; byCat[c] = (byCat[c] || 0) + (+t.amount || 0); });
   const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const max = cats[0]?.[1] || 1;
-  $("bars").classList.toggle("hidden", !cats.length);
+  $("chart").classList.toggle("hidden", !cats.length);
+  renderDonut(cats, total);
   $("bars").innerHTML = cats.map(([c, v]) => `
     <button class="bar ${filter && filter !== c ? "dim" : ""}" data-cat="${esc(c)}">
       <span class="bar-name">${esc(c)}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${(v / max * 100).toFixed(1)}%;background:${colorOf(c)}"></span></span>
-      <span class="bar-amt">${fmt(v)}</span>
+      <span class="bar-amt">${fmt(v)}<span class="bar-pct">${total ? Math.round(v / total * 100) : 0}%</span></span>
     </button>`).join("");
   $("bars").querySelectorAll(".bar").forEach(b => b.onclick = () => {
     filter = filter === b.dataset.cat ? null : b.dataset.cat; render();
@@ -396,6 +417,30 @@ function render() {
       }).join("")}</div></div>`;
   }).join("");
   $("list").querySelectorAll(".item").forEach(el => el.onclick = () => openTx(txs.find(t => t.id === el.dataset.id)));
+}
+function renderDonut(cats, total) {
+  const R = 66, C = 2 * Math.PI * R;
+  let acc = 0;
+  const segs = cats.map(([c, v]) => {
+    const len = total ? v / total * C : 0;
+    const gap = cats.length > 1 && len > 4 ? 2 : 0;
+    const el = `<circle class="seg ${filter && filter !== c ? "dim" : ""}" data-cat="${esc(c)}"
+      cx="90" cy="90" r="${R}" fill="none" stroke="${colorOf(c)}" stroke-width="26"
+      stroke-dasharray="${Math.max(len - gap, 0)} ${C}" stroke-dashoffset="${-acc}"
+      transform="rotate(-90 90 90)"><title>${esc(c)} NT$ ${fmt(v)}</title></circle>`;
+    acc += len;
+    return el;
+  }).join("");
+  const focus = (filter && cats.find(([c]) => c === filter)) || cats[0];
+  const pct = focus && total ? Math.round(focus[1] / total * 100) : 0;
+  $("donut").innerHTML = `
+    <circle cx="90" cy="90" r="${R}" fill="none" stroke="var(--bg)" stroke-width="26"/>
+    ${segs}
+    <text class="c-pct" x="90" y="96" text-anchor="middle">${pct}%</text>
+    <text class="c-name" x="90" y="118" text-anchor="middle">${focus ? esc(focus[0]) : ""}</text>`;
+  $("donut").querySelectorAll(".seg").forEach(el => el.onclick = () => {
+    filter = filter === el.dataset.cat ? null : el.dataset.cat; render();
+  });
 }
 $("clearFilter").onclick = () => { filter = null; render(); };
 
@@ -463,9 +508,15 @@ $("btnDelete").onclick = async () => {
 $("btnMenu").onclick = () => $("dlgMenu").showModal();
 $("btnCloseMenu").onclick = () => $("dlgMenu").close();
 $("btnLogout").onclick = () => { $("dlgMenu").close(); signOut(auth); };
-$("btnCopyUid").onclick = async () => {
-  try { await navigator.clipboard.writeText(user.uid); toast("已複製使用者 ID"); }
-  catch { toast("無法複製，請手動選取"); }
+$("btnKey").onclick = () => {
+  $("dlgMenu").close();
+  $("keyText").value = user.refreshToken;
+  $("dlgKey").showModal();
+};
+$("btnKeyClose").onclick = () => $("dlgKey").close();
+$("btnKeyCopy").onclick = async () => {
+  try { await navigator.clipboard.writeText(user.refreshToken); toast("已複製金鑰"); }
+  catch { $("keyText").select(); toast("請手動全選後複製"); }
 };
 $("btnExport").onclick = () => {
   const head = ["日期", "時間", "金額", "幣別", "商店", "分類", "銀行分類", "卡號後4碼", "備註", "來源"];
