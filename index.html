@@ -150,6 +150,36 @@
     background: var(--paper); font-size: 16px;
   }
   .searchbar input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  /* 消費分析 */
+  .an-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .an-head h2 { margin: 0; font-size: 19px; }
+  .an-box { background: var(--paper); border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; display: grid; gap: 12px; }
+  .an-range { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
+  .an-range select {
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--bg); font-size: 15px;
+  }
+  .an-range select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .presets button { border: 1px solid var(--line); background: var(--paper); border-radius: 16px; padding: 4px 12px; font-size: 13px; color: var(--muted); }
+  .presets button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  @media (prefers-color-scheme: dark) { .presets button.on { color: #0F1A1D; } }
+  .an-total { font-family: var(--num); font-size: 36px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .an-total small { font-size: .45em; color: var(--muted); margin-right: 4px; }
+  .an-meta { font-size: 13px; color: var(--muted); }
+  .an-list { background: var(--paper); border-radius: 12px; overflow: hidden; }
+  .an-row {
+    display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center;
+    width: 100%; padding: 12px 16px; background: none; border: 0; border-top: 1px solid var(--line); text-align: left;
+  }
+  .an-row:first-child { border-top: 0; }
+  .an-row:hover { background: var(--accent-soft); }
+  .an-rank { font-family: var(--num); font-size: 17px; font-weight: 600; color: var(--muted); text-align: center; }
+  .an-bar { height: 4px; border-radius: 2px; margin-top: 6px; background: var(--bg); overflow: hidden; }
+  .an-bar span { display: block; height: 100%; border-radius: 2px; }
+  .an-amt { text-align: right; }
+  .an-amt b { display: block; font-family: var(--num); font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .an-amt small { font-size: 12px; color: var(--muted); }
+  .an-more { width: 100%; margin-top: 12px; }
   .search-sum { background: var(--paper); border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; }
   .search-sum .big { font-family: var(--num); font-size: 34px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .search-sum .big small { font-size: .45em; color: var(--muted); margin-right: 4px; }
@@ -389,6 +419,26 @@
   <div id="list"></div>
 </main>
 
+<main id="analysis" class="wrap hidden">
+  <div class="an-head">
+    <button class="icon-btn" id="btnAnBack" aria-label="返回"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
+    <h2>店家消費排行</h2>
+  </div>
+  <div class="an-box">
+    <div class="an-range">
+      從 <select id="anYear" aria-label="開始年份"></select>
+      <select id="anMonth" aria-label="開始月份"></select> 到今天
+    </div>
+    <div class="presets" id="anPresets">
+      <button data-p="3">近 3 個月</button><button data-p="6">近半年</button><button data-p="12">近 1 年</button>
+      <button data-p="ytd">今年</button><button data-p="all">全部</button>
+    </div>
+    <div id="anSum"></div>
+  </div>
+  <div class="an-list" id="anList"></div>
+  <button class="btn-ghost an-more hidden" id="anMore"></button>
+</main>
+
 <button class="fab hidden" id="btnAdd">＋ 記一筆</button>
 
 <dialog id="dlgTx">
@@ -430,6 +480,7 @@
   <div class="dlg">
     <div class="dlg-head"><h3 id="menuName"></h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <div class="menu-list">
+      <button class="btn-ghost" id="btnAnalysis">消費分析（店家排行）</button>
       <button class="btn-ghost" id="btnCats">管理分類</button>
       <button class="btn-ghost" id="btnKey">複製自動匯入金鑰</button>
       <button class="btn-ghost" id="btnExport">匯出本期 CSV（Excel 可開）</button>
@@ -783,7 +834,7 @@ async function loadAll() {
     .sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
 }
 
-function setSearchMode(on) {
+function setSearchMode(on, initial = "") {
   searching = on;
   $("searchBar").classList.toggle("hidden", !on);
   $("searchSum").classList.toggle("hidden", !on);
@@ -793,7 +844,7 @@ function setSearchMode(on) {
   $("btnSearch").classList.toggle("hidden", on);
   if (on) {
     $("filterNote").classList.add("hidden");
-    $("searchInput").value = searchQ = "";
+    $("searchInput").value = searchQ = initial;
     $("searchInput").focus();
     $("searchSum").innerHTML = `<div class="sub2">載入所有紀錄中…</div>`;
     $("list").innerHTML = "";
@@ -825,7 +876,119 @@ function renderSearch() {
 }
 
 $("btnSearch").onclick = () => setSearchMode(true);
-$("btnSearchClose").onclick = () => setSearchMode(false);
+
+// ===== 消費分析：店家排行 =====
+let anStart = null, anData = null, anShowAll = false, anPreset = "12";
+const anCache = {};
+function monthsAgo(n) {
+  const d = new Date(now.getFullYear(), now.getMonth() - (n - 1), 1);
+  return { y: d.getFullYear(), m: d.getMonth() + 1 };
+}
+function fillAnSelects() {
+  let yrs = "";
+  for (let y = now.getFullYear(); y >= 2010; y--) yrs += `<option value="${y}">${y} 年</option>`;
+  $("anYear").innerHTML = yrs;
+  $("anMonth").innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1} 月</option>`).join("");
+}
+fillAnSelects();
+
+function clearAn() { Object.keys(anCache).forEach(k => delete anCache[k]); }
+function openAnalysis() {
+  if ($("dlgMenu").open) $("dlgMenu").close();
+  if (searching) setSearchMode(false);
+  $("app").classList.add("hidden");
+  $("btnAdd").classList.add("hidden");
+  $("analysis").classList.remove("hidden");
+  window.scrollTo(0, 0);
+  if (!anStart) applyPreset("12"); else loadAnalysis();
+}
+function closeAnalysis() {
+  $("analysis").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  $("btnAdd").classList.remove("hidden");
+}
+function applyPreset(p) {
+  anPreset = p;
+  if (p === "all") anStart = { y: 2010, m: 1, all: true };
+  else if (p === "ytd") anStart = { y: now.getFullYear(), m: 1 };
+  else anStart = monthsAgo(+p);
+  $("anYear").value = anStart.all ? now.getFullYear() - 10 : anStart.y;
+  $("anMonth").value = anStart.all ? 1 : anStart.m;
+  if (anStart.all) { $("anYear").value = 2010; }
+  loadAnalysis();
+}
+async function loadAnalysis() {
+  $("anPresets").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.p === anPreset));
+  const start = anStart.all ? "0000-00-00" : `${anStart.y}-${pad(anStart.m)}-01`;
+  anShowAll = false;
+  if (!anCache[start]) {
+    $("anSum").innerHTML = `<div class="an-meta">計算中…</div>`;
+    $("anList").innerHTML = "";
+    try {
+      const snap = await getDocs(query(collection(db, "users", user.uid, "transactions"), where("date", ">=", start)));
+      anCache[start] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (err) { $("anSum").innerHTML = `<div class="an-meta">讀取失敗：${esc(err.code)}</div>`; return; }
+  }
+  const rows = anCache[start].filter(isTwd);
+  const groups = {};
+  rows.forEach(t => {
+    const key = norm(t.store) || "（無名稱）";
+    const g = groups[key] ||= { names: {}, total: 0, count: 0, cats: {}, last: "" };
+    g.names[t.store || "（無名稱）"] = (g.names[t.store || "（無名稱）"] || 0) + 1;
+    g.total += net(t);
+    g.count++;
+    const c = t.category || UNCAT;
+    g.cats[c] = (g.cats[c] || 0) + 1;
+    if (t.date > g.last) g.last = t.date;
+  });
+  anData = Object.values(groups).map(g => ({
+    name: Object.entries(g.names).sort((a, b) => b[1] - a[1])[0][0],
+    total: g.total, count: g.count, last: g.last,
+    cat: Object.entries(g.cats).sort((a, b) => b[1] - a[1])[0][0],
+  })).filter(g => g.total > 0).sort((a, b) => b.total - a.total);
+  const total = anData.reduce((s, g) => s + g.total, 0);
+  const first = rows.reduce((m, t) => (!m || t.date < m ? t.date : m), "");
+  const from = anStart.all ? (first ? first.slice(0, 7).replace("-", " 年 ") + " 月" : "最早") : `${anStart.y} 年 ${anStart.m} 月`;
+  $("anSum").innerHTML = `
+    <div class="an-meta">${from}到今天，我實際花的</div>
+    <div class="an-total"><small>NT$</small>${fmt(total)}</div>
+    <div class="an-meta">共 ${anData.length} 家店、${rows.length} 筆消費。點店家可以看每一筆明細。</div>`;
+  renderAnList(total);
+}
+function renderAnList(total) {
+  const LIMIT = 30;
+  const shown = anShowAll ? anData : anData.slice(0, LIMIT);
+  const max = anData[0]?.total || 1;
+  $("anList").innerHTML = shown.length ? shown.map((g, i) => `
+    <button class="an-row" data-store="${esc(g.name)}">
+      <span class="an-rank">${i + 1}</span>
+      <span style="min-width:0">
+        <div class="store">${esc(g.name)}</div>
+        <div class="sub"><span style="color:${colorOf(g.cat)}">●</span> ${esc(g.cat)}，${g.count} 次，平均 ${fmt(g.total / g.count)}，最近 ${(g.last.slice(0, 4) == now.getFullYear() ? g.last.slice(5) : g.last).replaceAll("-", "/")}</div>
+        <div class="an-bar"><span style="width:${(g.total / max * 100).toFixed(1)}%;background:${colorOf(g.cat)}"></span></div>
+      </span>
+      <span class="an-amt"><b>${fmt(g.total)}</b><small>${total ? (g.total / total * 100).toFixed(1) : 0}%</small></span>
+    </button>`).join("") : `<div class="empty">這段期間沒有消費紀錄。</div>`;
+  $("anMore").classList.toggle("hidden", anShowAll || anData.length <= LIMIT);
+  $("anMore").textContent = `顯示全部 ${anData.length} 家店`;
+  $("anList").querySelectorAll(".an-row").forEach(r => r.onclick = () => {
+    closeAnalysis();
+    searchFromAn = true;
+    setSearchMode(true, r.dataset.store);
+  });
+}
+$("btnAnalysis").onclick = openAnalysis;
+$("btnAnBack").onclick = closeAnalysis;
+$("anMore").onclick = () => { anShowAll = true; renderAnList(anData.reduce((s, g) => s + g.total, 0)); };
+$("anPresets").querySelectorAll("button").forEach(b => b.onclick = () => applyPreset(b.dataset.p));
+const anPick = () => { anPreset = ""; anStart = { y: +$("anYear").value, m: +$("anMonth").value }; loadAnalysis(); };
+$("anYear").onchange = anPick;
+$("anMonth").onchange = anPick;
+let searchFromAn = false;
+$("btnSearchClose").onclick = () => {
+  setSearchMode(false);
+  if (searchFromAn) { searchFromAn = false; openAnalysis(); }   // 從排行點進來的，取消後回到排行
+};
 let searchTimer;
 $("searchInput").oninput = () => {
   clearTimeout(searchTimer);
@@ -1145,7 +1308,7 @@ $("txForm").onsubmit = async e => {
       }
     }
     toast(msg);
-    cycleCache = {};
+    cycleCache = {}; clearAn();
     $("dlgTx").close();
     if (searching) { await loadAll(); renderSearch(); return; }
     const c = cycleOf(...data.date.split("-").map(Number));
@@ -1164,11 +1327,11 @@ $("btnDelete").onclick = async () => {
   const { id: _omit, ...backup } = old || {};
   await deleteDoc(doc(db, "users", user.uid, "transactions", id));
   $("dlgTx").close();
-  cycleCache = {};
+  cycleCache = {}; clearAn();
   if (searching) { allTxs = allTxs.filter(t => t.id !== id); renderSearch(); }
   if (old) showUndo(`已刪除「${old.store || "這筆消費"}」`, async () => {
     await setDoc(doc(db, "users", user.uid, "transactions", id), backup);
-    cycleCache = {};
+    cycleCache = {}; clearAn();
     if (searching) { await loadAll(); renderSearch(); }
     toast("已復原");
   });
@@ -1283,7 +1446,7 @@ $("btnCatSave").onclick = async () => {
     if (filter && !names.includes(filter)) filter = null;
     $("dlgCats").close();
     toast("分類已儲存");
-    cycleCache = {};
+    cycleCache = {}; clearAn();
   } catch (err) {
     toast("儲存失敗：" + err.code);
   } finally {
