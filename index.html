@@ -82,7 +82,12 @@
   .total small { font-size: .4em; font-weight: 600; color: var(--muted); margin-right: 6px; letter-spacing: 0; }
   .meta { color: var(--muted); font-size: 14px; }
   .split { display: flex; gap: 24px; margin-top: 14px; }
-  .split div { font-size: 13px; color: var(--muted); }
+  .split button {
+    font-size: 13px; color: var(--muted); background: none; text-align: left;
+    border: 0; border-bottom: 2px solid transparent; padding: 0 2px 4px; border-radius: 0;
+  }
+  .split button.on { border-bottom-color: var(--accent); color: var(--accent); }
+  .split button.dim { opacity: .4; }
   .split b { display: block; font-family: var(--num); font-size: 22px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
   .tag { display: inline-block; font-size: 12px; line-height: 1.5; padding: 0 6px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); }
   .chart { margin-top: 20px; border-top: 1px dashed var(--line); padding-top: 20px; display: grid; gap: 18px; }
@@ -303,7 +308,10 @@ function cycleRange({ y, m }) {
   };
 }
 
-let user = null, unsub = null, txs = [], filter = null, editingId = null;
+let user = null, unsub = null, txs = [], filter = null, region = null, editingId = null;
+const isAbroad = t => !!t.region && t.region !== "TW";
+const REGION_NAME = { domestic: "國內", abroad: "海外" };
+const inRegion = t => !region || (region === "abroad") === isAbroad(t);
 const now = new Date();
 let ym = cycleOf(now.getFullYear(), now.getMonth() + 1, now.getDate());
 
@@ -359,7 +367,7 @@ function shiftMonth(d) {
   ym.m += d;
   if (ym.m < 1) { ym.m = 12; ym.y--; }
   if (ym.m > 12) { ym.m = 1; ym.y++; }
-  filter = null;
+  filter = null; region = null;
   subscribe();
 }
 $("prevMonth").onclick = () => shiftMonth(-1);
@@ -375,31 +383,43 @@ function render() {
     ? `共 ${txs.length} 筆` + (foreign ? `，另有 ${foreign} 筆外幣未計入` : "")
     : "這一期還沒有紀錄";
 
-  const isAbroad = t => t.region && t.region !== "TW";
   const abroad = twd.filter(isAbroad).reduce((s, t) => s + (+t.amount || 0), 0);
+  const btn = (key, v) => `<button data-r="${key}" class="${region === key ? "on" : region ? "dim" : ""}"
+      aria-pressed="${region === key}">${REGION_NAME[key]}<b>${fmt(v)}</b></button>`;
   $("split").classList.toggle("hidden", !txs.length);
-  $("split").innerHTML = `<div>國內<b>${fmt(total - abroad)}</b></div><div>海外<b>${fmt(abroad)}</b></div>`;
+  $("split").innerHTML = btn("domestic", total - abroad) + btn("abroad", abroad);
+  $("split").querySelectorAll("button").forEach(b => b.onclick = () => {
+    region = region === b.dataset.r ? null : b.dataset.r;
+    filter = null;
+    render();
+  });
 
+  // 圖表依國內／海外篩選後計算
+  const base = twd.filter(inRegion);
+  const chartTotal = base.reduce((s, t) => s + (+t.amount || 0), 0);
   const byCat = {};
-  twd.forEach(t => { const c = t.category || UNCAT; byCat[c] = (byCat[c] || 0) + (+t.amount || 0); });
+  base.forEach(t => { const c = t.category || UNCAT; byCat[c] = (byCat[c] || 0) + (+t.amount || 0); });
   const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const max = cats[0]?.[1] || 1;
   $("chart").classList.toggle("hidden", !cats.length);
-  renderDonut(cats, total);
+  renderDonut(cats, chartTotal);
   $("bars").innerHTML = cats.map(([c, v]) => `
     <button class="bar ${filter && filter !== c ? "dim" : ""}" data-cat="${esc(c)}">
       <span class="bar-name">${esc(c)}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${(v / max * 100).toFixed(1)}%;background:${colorOf(c)}"></span></span>
-      <span class="bar-amt">${fmt(v)}<span class="bar-pct">${total ? Math.round(v / total * 100) : 0}%</span></span>
+      <span class="bar-amt">${fmt(v)}<span class="bar-pct">${chartTotal ? Math.round(v / chartTotal * 100) : 0}%</span></span>
     </button>`).join("");
   $("bars").querySelectorAll(".bar").forEach(b => b.onclick = () => {
     filter = filter === b.dataset.cat ? null : b.dataset.cat; render();
   });
 
-  $("filterNote").classList.toggle("hidden", !filter);
-  $("filterText").textContent = filter ? `只顯示「${filter}」` : "";
+  const parts = [region && REGION_NAME[region], filter].filter(Boolean);
+  $("filterNote").classList.toggle("hidden", !parts.length);
+  $("filterText").textContent = parts.length ? `只顯示「${parts.join("・")}」，共 NT$ ${fmt(
+    txs.filter(t => inRegion(t) && (!filter || (t.category || UNCAT) === filter) && (!t.currency || t.currency === "TWD"))
+       .reduce((s, t) => s + (+t.amount || 0), 0))}` : "";
 
-  const shown = filter ? txs.filter(t => (t.category || UNCAT) === filter) : txs;
+  const shown = txs.filter(t => inRegion(t) && (!filter || (t.category || UNCAT) === filter));
   if (!shown.length) {
     $("list").innerHTML = `<div class="empty">還沒有任何消費。<br><button class="btn-primary" id="emptyAdd">記一筆</button></div>`;
     $("emptyAdd").onclick = () => openTx();
@@ -453,7 +473,7 @@ function renderDonut(cats, total) {
     filter = filter === el.dataset.cat ? null : el.dataset.cat; render();
   });
 }
-$("clearFilter").onclick = () => { filter = null; render(); };
+$("clearFilter").onclick = () => { filter = null; region = null; render(); };
 
 // ===== 新增 / 編輯 =====
 function openTx(t) {
