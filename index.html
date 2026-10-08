@@ -161,6 +161,9 @@
   .cat-row input[type=text] { border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--bg); min-width: 0; width: 100%; }
   .cat-row button { background: none; border: 0; color: var(--danger); padding: 8px; font-size: 14px; }
   .cat-hint { font-size: 13px; color: var(--muted); margin: 0; }
+  .field-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .link-btn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 13px; font-weight: 500; }
+  .field small { font-size: 12px; color: var(--muted); }
   .menu-list button { text-align: left; }
 
   .toast {
@@ -221,7 +224,11 @@
       <div class="field"><label for="fAmount">金額</label><input type="number" id="fAmount" inputmode="decimal" step="any" min="0" required></div>
     </div>
     <div class="field"><label for="fStore">商店或項目</label><input id="fStore" required placeholder="例如：早餐店"></div>
-    <div class="field"><label for="fCat">分類</label><select id="fCat"></select></div>
+    <div class="field">
+      <div class="field-head"><label for="fCat">分類</label><button type="button" class="link-btn" id="btnCatsInline">管理分類</button></div>
+      <select id="fCat"></select>
+      <small>想新增、改名或刪除分類，點右上方「管理分類」，或從右上角頭像 →「管理分類」進入。</small>
+    </div>
     <div class="field"><label for="fNote">備註</label><input id="fNote" placeholder="選填"></div>
     <div class="info hidden" id="fInfo"></div>
     <div class="dlg-actions">
@@ -339,10 +346,12 @@ const now = new Date();
 let ym = cycleOf(now.getFullYear(), now.getMonth() + 1, now.getDate());
 
 function fillCatSelect(current) {
+  const prev = $("fCat").value;
   const names = CATEGORIES.map(([c]) => c);
   if (current && !names.includes(current)) names.push(current);
   $("fCat").innerHTML = `<option value="">${UNCAT}</option>` +
     names.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  if (names.includes(prev)) $("fCat").value = prev;
 }
 fillCatSelect();
 
@@ -589,12 +598,14 @@ function catRow(name = "", color, orig = "") {
   row.querySelector("button").onclick = () => row.remove();
   return row;
 }
-$("btnCats").onclick = () => {
-  $("dlgMenu").close();
+function openCats() {
+  if ($("dlgMenu").open) $("dlgMenu").close();
   $("catList").innerHTML = "";
   CATEGORIES.forEach(([n, c]) => $("catList").append(catRow(n, c, n)));
   $("dlgCats").showModal();
-};
+}
+$("btnCats").onclick = openCats;
+$("btnCatsInline").onclick = openCats;
 $("btnCatAdd").onclick = () => {
   const row = catRow();
   $("catList").append(row);
