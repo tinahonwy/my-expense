@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#E8ECEA">
+<title>我的記帳</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #E8ECEA;
+    --paper: #FFFFFF;
+    --ink: #1C2A33;
+    --muted: #66747C;
+    --line: #D5DCD9;
+    --accent: #146C6B;
+    --accent-soft: #DCEDEA;
+    --danger: #B3261E;
+    --num: "Barlow Condensed", "Noto Sans TC", system-ui, sans-serif;
+    --text: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141B1F; --paper: #1E282E; --ink: #E6ECEA; --muted: #93A1A8;
+      --line: #2E3B42; --accent: #5BC0B4; --accent-soft: #1F3B3A; --danger: #F2827A;
+    }
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--text); font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .hidden { display: none !important; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 16px 16px 120px; }
+
+  /* 登入畫面 */
+  #login { min-height: 100vh; display: grid; place-items: center; padding: 24px; text-align: center; }
+  #login h1 { font-size: 28px; margin: 0 0 8px; }
+  #login p { color: var(--muted); margin: 0 0 28px; }
+  .btn-primary {
+    background: var(--accent); color: #fff; border: 0; border-radius: 10px;
+    padding: 12px 22px; font-weight: 500;
+  }
+  @media (prefers-color-scheme: dark) { .btn-primary { color: #0F1A1D; } }
+  .btn-ghost { background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px; }
+  .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: 10px; padding: 10px 16px; }
+
+  /* 頂部月份切換 */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .month { display: flex; align-items: center; gap: 4px; }
+  .month button { background: none; border: 0; font-size: 22px; width: 40px; height: 40px; border-radius: 50%; }
+  .month button:hover { background: var(--paper); }
+  .month h2 { margin: 0; font-size: 18px; font-weight: 700; min-width: 120px; text-align: center; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 0; overflow: hidden; background: var(--line); }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* 收據樣式的總覽 */
+  .receipt {
+    background: var(--paper); padding: 22px 22px 30px; position: relative;
+    border-radius: 4px 4px 0 0; margin-bottom: 28px;
+  }
+  .receipt::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -10px; height: 10px;
+    background:
+      linear-gradient(-45deg, transparent 7px, var(--paper) 0) 0 0 / 14px 10px repeat-x,
+      linear-gradient(45deg, transparent 7px, var(--paper) 0) 0 0 / 14px 10px repeat-x;
+  }
+  .receipt-label { color: var(--muted); font-size: 14px; }
+  .total { font-family: var(--num); font-weight: 700; font-size: clamp(52px, 15vw, 76px); line-height: 1; letter-spacing: -.5px; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
+  .total small { font-size: .4em; font-weight: 600; color: var(--muted); margin-right: 6px; letter-spacing: 0; }
+  .meta { color: var(--muted); font-size: 14px; }
+  .bars { margin-top: 20px; border-top: 1px dashed var(--line); padding-top: 16px; display: grid; gap: 10px; }
+  .bar { display: grid; grid-template-columns: 80px 1fr auto; align-items: center; gap: 10px; background: none; border: 0; padding: 2px 0; text-align: left; width: 100%; }
+  .bar-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; }
+  .bar-amt { font-family: var(--num); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+  .bar.dim { opacity: .35; }
+
+  /* 消費清單 */
+  .filter-note { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--muted); margin: 0 4px 10px; }
+  .filter-note button { background: none; border: 0; color: var(--accent); padding: 4px; }
+  .day { margin-bottom: 18px; }
+  .day-head { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); padding: 0 4px 6px; }
+  .day-head span:last-child { font-family: var(--num); font-size: 15px; }
+  .items { background: var(--paper); border-radius: 12px; overflow: hidden; }
+  .item {
+    display: grid; grid-template-columns: 10px 1fr auto; gap: 12px; align-items: center;
+    width: 100%; padding: 13px 16px; background: none; border: 0; text-align: left;
+    border-top: 1px solid var(--line);
+  }
+  .item:first-child { border-top: 0; }
+  .item:hover { background: var(--accent-soft); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .store { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub { font-size: 13px; color: var(--muted); }
+  .amt { font-family: var(--num); font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .uncat { color: var(--danger); }
+  .empty { text-align: center; color: var(--muted); padding: 48px 16px; }
+  .empty button { margin-top: 12px; }
+
+  .fab {
+    position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    background: var(--accent); color: #fff; border: 0; border-radius: 28px;
+    padding: 15px 24px; font-weight: 700; font-size: 16px;
+    box-shadow: 0 6px 18px rgba(20, 108, 107, .35);
+  }
+  @media (prefers-color-scheme: dark) { .fab { color: #0F1A1D; } }
+
+  /* 對話框 */
+  dialog {
+    border: 0; border-radius: 16px; padding: 0; width: min(440px, calc(100% - 24px));
+    background: var(--paper); color: var(--ink);
+  }
+  dialog::backdrop { background: rgba(10, 20, 25, .45); }
+  .dlg { padding: 22px; display: grid; gap: 14px; }
+  .dlg h3 { margin: 0; font-size: 18px; }
+  .field { display: grid; gap: 4px; }
+  .field label { font-size: 13px; color: var(--muted); }
+  .field input, .field select {
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    background: var(--bg); width: 100%; min-width: 0;
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .dlg-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 4px; }
+  .dlg-actions .btn-danger { margin-right: auto; }
+  .info { font-size: 13px; color: var(--muted); background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+  .uid { font-family: var(--num); font-size: 15px; word-break: break-all; color: var(--ink); }
+  .menu-list { display: grid; gap: 8px; }
+  .menu-list button { text-align: left; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+    background: var(--ink); color: var(--paper); padding: 10px 18px; border-radius: 20px; font-size: 14px;
+    opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+
+<section id="login" class="hidden">
+  <div>
+    <h1>🧾 我的記帳</h1>
+    <p>刷卡紀錄自動匯入，現金消費隨手記</p>
+    <button class="btn-primary" id="btnLogin">使用 Google 帳號登入</button>
+    <p id="loginErr" class="uncat" style="margin-top:16px"></p>
+  </div>
+</section>
+
+<main id="app" class="wrap hidden">
+  <div class="topbar">
+    <div class="month">
+      <button id="prevMonth" aria-label="上個月">‹</button>
+      <h2 id="monthLabel"></h2>
+      <button id="nextMonth" aria-label="下個月">›</button>
+    </div>
+    <button class="avatar" id="btnMenu" aria-label="選單"><img id="avatarImg" alt=""></button>
+  </div>
+
+  <section class="receipt">
+    <div class="receipt-label">本月支出</div>
+    <div class="total"><small>NT$</small><span id="total">0</span></div>
+    <div class="meta" id="meta"></div>
+    <div class="bars" id="bars"></div>
+  </section>
+
+  <div class="filter-note hidden" id="filterNote">
+    <span id="filterText"></span>
+    <button id="clearFilter">顯示全部</button>
+  </div>
+  <div id="list"></div>
+</main>
+
+<button class="fab hidden" id="btnAdd">＋ 記一筆</button>
+
+<dialog id="dlgTx">
+  <form class="dlg" method="dialog" id="txForm">
+    <h3 id="txTitle">記一筆</h3>
+    <div class="row2">
+      <div class="field"><label for="fDate">日期</label><input type="date" id="fDate" required></div>
+      <div class="field"><label for="fAmount">金額</label><input type="number" id="fAmount" inputmode="decimal" step="any" min="0" required></div>
+    </div>
+    <div class="field"><label for="fStore">商店或項目</label><input id="fStore" required placeholder="例如：早餐店"></div>
+    <div class="field"><label for="fCat">分類</label><select id="fCat"></select></div>
+    <div class="field"><label for="fNote">備註</label><input id="fNote" placeholder="選填"></div>
+    <div class="info hidden" id="fInfo"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn-danger hidden" id="btnDelete">刪除</button>
+      <button type="button" class="btn-ghost" id="btnCancel">取消</button>
+      <button type="submit" class="btn-primary" id="btnSave">儲存</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgMenu">
+  <div class="dlg">
+    <h3 id="menuName"></h3>
+    <div class="info">
+      你的使用者 ID（設定 Apps Script 自動匯入時需要）
+      <div class="uid" id="uidText"></div>
+    </div>
+    <div class="menu-list">
+      <button class="btn-ghost" id="btnCopyUid">複製使用者 ID</button>
+      <button class="btn-ghost" id="btnExport">匯出本月 CSV（Excel 可開）</button>
+      <button class="btn-ghost" id="btnLogout">登出</button>
+      <button class="btn-ghost" id="btnCloseMenu">關閉</button>
+    </div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, query, where, orderBy, onSnapshot,
+         addDoc, updateDoc, deleteDoc, doc, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDbodX5R1fg2EHnSoh5jf9ZFPWThqQ_TOU",
+  authDomain: "my-expense-f314a.firebaseapp.com",
+  projectId: "my-expense-f314a",
+  storageBucket: "my-expense-f314a.firebasestorage.app",
+  messagingSenderId: "208507111007",
+  appId: "1:208507111007:web:50e2c757cc44619e39fdea",
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// 分類與顏色（可自行增減）
+const CATEGORIES = [
+  ["餐飲", "#E07A2E"], ["日常生活", "#2E8B57"], ["購物", "#C2417A"],
+  ["交通", "#2F6FB3"], ["訂閱", "#7A5BC2"], ["娛樂", "#D4A21E"],
+  ["居住", "#5B7C8A"], ["醫療", "#C94A3F"], ["其他", "#8A8F86"],
+];
+const UNCAT = "未分類";
+const colorOf = c => (CATEGORIES.find(x => x[0] === c) || [, "#B9C0BC"])[1];
+
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString("zh-TW");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pad = n => String(n).padStart(2, "0");
+const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+
+let user = null, unsub = null, txs = [], filter = null, editingId = null;
+const now = new Date();
+let ym = { y: now.getFullYear(), m: now.getMonth() + 1 };
+
+$("fCat").innerHTML = `<option value="">${UNCAT}</option>` +
+  CATEGORIES.map(([c]) => `<option>${c}</option>`).join("");
+
+// ===== 登入 =====
+$("btnLogin").onclick = async () => {
+  $("loginErr").textContent = "";
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (e) {
+    const msg = {
+      "auth/popup-blocked": "登入視窗被瀏覽器擋住了，請允許彈出視窗後再試一次。",
+      "auth/unauthorized-domain": "這個網域尚未授權。請到 Firebase Authentication → 設定 → 已授權的網域，加入目前的網址。",
+      "auth/popup-closed-by-user": "",
+    }[e.code];
+    $("loginErr").textContent = msg ?? ("登入失敗：" + e.code);
+  }
+};
+
+onAuthStateChanged(auth, u => {
+  user = u;
+  $("login").classList.toggle("hidden", !!u);
+  $("app").classList.toggle("hidden", !u);
+  $("btnAdd").classList.toggle("hidden", !u);
+  if (u) {
+    $("avatarImg").src = u.photoURL || "";
+    $("menuName").textContent = u.displayName || u.email;
+    $("uidText").textContent = u.uid;
+    subscribe();
+  } else if (unsub) { unsub(); unsub = null; }
+});
+
+// ===== 讀取當月資料（即時同步） =====
+function subscribe() {
+  if (unsub) unsub();
+  $("monthLabel").textContent = `${ym.y} 年 ${ym.m} 月`;
+  const start = `${ym.y}-${pad(ym.m)}-01`;
+  const next = ym.m === 12 ? `${ym.y + 1}-01-01` : `${ym.y}-${pad(ym.m + 1)}-01`;
+  const q = query(collection(db, "users", user.uid, "transactions"),
+    where("date", ">=", start), where("date", "<", next), orderBy("date", "desc"));
+  $("list").innerHTML = `<div class="empty">載入中…</div>`;
+  unsub = onSnapshot(q, snap => {
+    txs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
+    render();
+  }, err => {
+    $("list").innerHTML = `<div class="empty">無法讀取資料：${esc(err.code)}<br>請確認 Firestore 安全規則已經發布。</div>`;
+  });
+}
+
+function shiftMonth(d) {
+  ym.m += d;
+  if (ym.m < 1) { ym.m = 12; ym.y--; }
+  if (ym.m > 12) { ym.m = 1; ym.y++; }
+  filter = null;
+  subscribe();
+}
+$("prevMonth").onclick = () => shiftMonth(-1);
+$("nextMonth").onclick = () => shiftMonth(1);
+
+// ===== 畫面 =====
+function render() {
+  const twd = txs.filter(t => !t.currency || t.currency === "TWD");
+  const foreign = txs.length - twd.length;
+  const total = twd.reduce((s, t) => s + (+t.amount || 0), 0);
+  $("total").textContent = fmt(total);
+  $("meta").textContent = txs.length
+    ? `共 ${txs.length} 筆` + (foreign ? `，另有 ${foreign} 筆外幣未計入` : "")
+    : "這個月還沒有紀錄";
+
+  const byCat = {};
+  twd.forEach(t => { const c = t.category || UNCAT; byCat[c] = (byCat[c] || 0) + (+t.amount || 0); });
+  const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const max = cats[0]?.[1] || 1;
+  $("bars").classList.toggle("hidden", !cats.length);
+  $("bars").innerHTML = cats.map(([c, v]) => `
+    <button class="bar ${filter && filter !== c ? "dim" : ""}" data-cat="${esc(c)}">
+      <span class="bar-name">${esc(c)}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${(v / max * 100).toFixed(1)}%;background:${colorOf(c)}"></span></span>
+      <span class="bar-amt">${fmt(v)}</span>
+    </button>`).join("");
+  $("bars").querySelectorAll(".bar").forEach(b => b.onclick = () => {
+    filter = filter === b.dataset.cat ? null : b.dataset.cat; render();
+  });
+
+  $("filterNote").classList.toggle("hidden", !filter);
+  $("filterText").textContent = filter ? `只顯示「${filter}」` : "";
+
+  const shown = filter ? txs.filter(t => (t.category || UNCAT) === filter) : txs;
+  if (!shown.length) {
+    $("list").innerHTML = `<div class="empty">還沒有任何消費。<br><button class="btn-primary" id="emptyAdd">記一筆</button></div>`;
+    $("emptyAdd").onclick = () => openTx();
+    return;
+  }
+  const days = {};
+  shown.forEach(t => (days[t.date] ||= []).push(t));
+  $("list").innerHTML = Object.entries(days).map(([date, items]) => {
+    const d = new Date(date + "T00:00:00");
+    const sum = items.filter(t => !t.currency || t.currency === "TWD").reduce((s, t) => s + (+t.amount || 0), 0);
+    return `<div class="day">
+      <div class="day-head"><span>${d.getMonth() + 1}/${d.getDate()}（${WEEK[d.getDay()]}）</span><span>NT$ ${fmt(sum)}</span></div>
+      <div class="items">${items.map(t => {
+        const cat = t.category || UNCAT;
+        const bits = [`<span class="${t.category ? "" : "uncat"}">${esc(cat)}</span>`];
+        if (t.time) bits.push(esc(t.time));
+        if (t.card) bits.push("卡 " + esc(t.card));
+        if (t.note) bits.push(esc(t.note));
+        const cur = t.currency && t.currency !== "TWD" ? `<small>${esc(t.currency)} </small>` : "";
+        return `<button class="item" data-id="${t.id}">
+          <span class="dot" style="background:${colorOf(cat)}"></span>
+          <span style="min-width:0"><div class="store">${esc(t.store || "（無名稱）")}</div><div class="sub">${bits.join("，")}</div></span>
+          <span class="amt">${cur}${fmt(t.amount)}</span>
+        </button>`;
+      }).join("")}</div></div>`;
+  }).join("");
+  $("list").querySelectorAll(".item").forEach(el => el.onclick = () => openTx(txs.find(t => t.id === el.dataset.id)));
+}
+$("clearFilter").onclick = () => { filter = null; render(); };
+
+// ===== 新增 / 編輯 =====
+function openTx(t) {
+  editingId = t?.id || null;
+  $("txTitle").textContent = t ? "編輯消費" : "記一筆";
+  const today = new Date();
+  $("fDate").value = t?.date || `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  $("fAmount").value = t?.amount ?? "";
+  $("fStore").value = t?.store || "";
+  $("fCat").value = t?.category || "";
+  $("fNote").value = t?.note || "";
+  $("btnDelete").classList.toggle("hidden", !t);
+  const info = [];
+  if (t?.source === "gmail") info.push("由刷卡通知信自動匯入");
+  if (t?.bankCategory) info.push("銀行分類：" + t.bankCategory);
+  if (t?.card) info.push("卡號後 4 碼：" + t.card);
+  $("fInfo").textContent = info.join("，");
+  $("fInfo").classList.toggle("hidden", !info.length);
+  $("dlgTx").showModal();
+  if (!t) $("fAmount").focus();
+}
+$("btnAdd").onclick = () => openTx();
+$("btnCancel").onclick = () => $("dlgTx").close();
+
+$("txForm").onsubmit = async e => {
+  e.preventDefault();
+  const data = {
+    date: $("fDate").value,
+    amount: parseFloat($("fAmount").value),
+    store: $("fStore").value.trim(),
+    category: $("fCat").value,
+    note: $("fNote").value.trim(),
+  };
+  if (!data.date || isNaN(data.amount)) return;
+  $("btnSave").disabled = true;
+  try {
+    const col = collection(db, "users", user.uid, "transactions");
+    if (editingId) {
+      await updateDoc(doc(col, editingId), { ...data, updatedAt: serverTimestamp() });
+      toast("已儲存");
+    } else {
+      await addDoc(col, { ...data, currency: "TWD", source: "manual", createdAt: serverTimestamp() });
+      toast("已新增");
+    }
+    $("dlgTx").close();
+    const [y, m] = data.date.split("-").map(Number);
+    if (y !== ym.y || m !== ym.m) { ym = { y, m }; subscribe(); }
+  } catch (err) {
+    toast("儲存失敗：" + err.code);
+  } finally {
+    $("btnSave").disabled = false;
+  }
+};
+
+$("btnDelete").onclick = async () => {
+  if (!editingId || !confirm("確定要刪除這筆消費嗎？")) return;
+  await deleteDoc(doc(db, "users", user.uid, "transactions", editingId));
+  $("dlgTx").close();
+  toast("已刪除");
+};
+
+// ===== 選單 =====
+$("btnMenu").onclick = () => $("dlgMenu").showModal();
+$("btnCloseMenu").onclick = () => $("dlgMenu").close();
+$("btnLogout").onclick = () => { $("dlgMenu").close(); signOut(auth); };
+$("btnCopyUid").onclick = async () => {
+  try { await navigator.clipboard.writeText(user.uid); toast("已複製使用者 ID"); }
+  catch { toast("無法複製，請手動選取"); }
+};
+$("btnExport").onclick = () => {
+  const head = ["日期", "時間", "金額", "幣別", "商店", "分類", "銀行分類", "卡號後4碼", "備註", "來源"];
+  const rows = [...txs].reverse().map(t => [t.date, t.time, t.amount, t.currency || "TWD", t.store,
+    t.category || UNCAT, t.bankCategory, t.card, t.note, t.source === "gmail" ? "刷卡通知" : "手動"]);
+  const csv = [head, ...rows].map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `記帳_${ym.y}-${pad(ym.m)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+let toastTimer;
+function toast(msg) {
+  $("toast").textContent = msg;
+  $("toast").classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("toast").classList.remove("show"), 1800);
+}
+</script>
+</body>
+</html>
