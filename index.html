@@ -170,6 +170,27 @@
       linear-gradient(45deg, transparent 7px, var(--paper) 0) 0 0 / 14px 10px repeat-x;
   }
   .receipt-label { color: var(--muted); font-size: 14px; }
+  .bill-row { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .bill-row b { font-family: var(--num); font-size: 16px; font-weight: 600; color: var(--ink); margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .bill-row button { background: var(--danger-soft); color: var(--danger); border: 0; border-radius: 8px; padding: 2px 8px; font-size: 13px; }
+  .bill-row button b { color: var(--danger); }
+  .bill-row button.on { outline: 2px solid var(--danger); }
+  .amt-wrap { text-align: right; }
+  .amt-net { display: block; font-size: 12px; color: var(--muted); }
+  .tag.owe { background: var(--danger-soft); color: var(--danger); }
+  .back-box { display: grid; gap: 8px; background: var(--bg); border-radius: 12px; padding: 12px; }
+  .back-box .row2 input {
+    width: 100%; min-width: 0; background: var(--paper);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  }
+  .back-box .row2 input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .back-box .field-head { flex-wrap: wrap; gap: 6px; }
+  .quick { display: flex; gap: 6px; }
+  .quick button { border: 1px solid var(--line); background: var(--paper); border-radius: 8px; padding: 3px 10px; font-size: 13px; }
+  .check-inline { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+  .check-inline input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+  .back-hint { font-size: 13px; color: var(--muted); }
+  .back-hint b { color: var(--ink); font-family: var(--num); font-size: 15px; }
   .total { font-family: var(--num); font-weight: 700; font-size: clamp(52px, 15vw, 76px); line-height: 1; letter-spacing: -.5px; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
   .total small { font-size: .4em; font-weight: 600; color: var(--muted); margin-right: 6px; letter-spacing: 0; }
   .meta { color: var(--muted); font-size: 14px; }
@@ -320,9 +341,10 @@
   <div id="searchSum" class="search-sum hidden"></div>
 
   <section class="receipt" id="receipt">
-    <div class="receipt-label">本期支出</div>
+    <div class="receipt-label">本期我實際花的</div>
     <div class="total"><small>NT$</small><span id="total">0</span></div>
     <div class="meta" id="meta"></div>
+    <div class="bill-row hidden" id="billRow"></div>
     <div class="split hidden" id="split"></div>
     <div class="chart" id="chart">
       <svg class="donut" id="donut" viewBox="0 0 180 180" role="img" aria-label="各分類支出比例"></svg>
@@ -368,6 +390,17 @@
       <small>想新增、改名或刪除分類，點右上方「管理分類」，或從右上角頭像 →「管理分類」進入。</small>
     </div>
     <label class="check hidden" id="ruleBox"><input type="checkbox" id="fRule"><span id="ruleText"></span></label>
+    <div class="back-box">
+      <div class="field-head"><label for="fBack" style="font-size:13px;color:var(--muted)">別人分攤（例如同學給我的錢）</label>
+        <div class="quick"><button type="button" data-q="half">一半</button><button type="button" data-q="all">全部</button><button type="button" data-q="clear">清除</button></div>
+      </div>
+      <div class="row2">
+        <input type="number" id="fBack" inputmode="decimal" step="any" min="0" placeholder="0" aria-label="分攤金額">
+        <input id="fBackWho" placeholder="誰（選填）" aria-label="誰付的">
+      </div>
+      <label class="check-inline"><input type="checkbox" id="fBackPending">還沒收到，先記著</label>
+      <div class="back-hint" id="fBackHint"></div>
+    </div>
     <div class="field"><label for="fNote">備註</label><input id="fNote" placeholder="選填"></div>
     <div class="info hidden" id="fInfo"></div>
     <div class="dlg-actions">
@@ -494,6 +527,9 @@ let user = null, unsub = null, txs = [], filter = null, region = null, editingId
 let storeRules = {}, unsubRules = null;       // 店家 → 分類
 let searching = false, allTxs = null, searchQ = "";
 const isAbroad = t => !!t.region && t.region !== "TW";
+const net = t => (+t.amount || 0) - (+t.paidBack || 0);     // 我實際花的 = 金額 − 別人分攤
+const isTwd = t => !t.currency || t.currency === "TWD";
+let onlyPending = false;
 const REGION_NAME = { domestic: "國內", abroad: "海外" };
 const inRegion = t => !region || (region === "abroad") === isAbroad(t);
 const now = new Date();
@@ -590,13 +626,26 @@ function render() {
   if (searching) return renderSearch();
   const twd = txs.filter(t => !t.currency || t.currency === "TWD");
   const foreign = txs.length - twd.length;
-  const total = twd.reduce((s, t) => s + (+t.amount || 0), 0);
+  const total = twd.reduce((s, t) => s + net(t), 0);
+  const gross = twd.reduce((s, t) => s + (+t.amount || 0), 0);
+  const card = twd.filter(t => t.source === "gmail").reduce((s, t) => s + (+t.amount || 0), 0);
+  const back = gross - total;
+  const pendingList = twd.filter(t => t.backPending && +t.paidBack > 0);
+  const pending = pendingList.reduce((s, t) => s + (+t.paidBack || 0), 0);
+  if (!pendingList.length) onlyPending = false;
   $("total").textContent = fmt(total);
   $("meta").textContent = txs.length
     ? `共 ${txs.length} 筆` + (foreign ? `，另有 ${foreign} 筆外幣未計入` : "")
     : "這一期還沒有紀錄";
+  $("billRow").classList.toggle("hidden", !txs.length);
+  $("billRow").innerHTML =
+    `<span>信用卡帳單<b>${fmt(card)}</b></span>` +
+    (gross !== card ? `<span>全部紀錄<b>${fmt(gross)}</b></span>` : "") +
+    (back ? `<span>別人分攤<b>${fmt(back)}</b></span>` : "") +
+    (pending ? `<button id="btnPending" class="${onlyPending ? "on" : ""}">待收<b>${fmt(pending)}</b></button>` : "");
+  if (pending) $("btnPending").onclick = () => { onlyPending = !onlyPending; render(); };
 
-  const abroad = twd.filter(isAbroad).reduce((s, t) => s + (+t.amount || 0), 0);
+  const abroad = twd.filter(isAbroad).reduce((s, t) => s + net(t), 0);
   const btn = (key, v) => `<button data-r="${key}" class="${region === key ? "on" : region ? "dim" : ""}"
       aria-pressed="${region === key}">${REGION_NAME[key]}<b>${fmt(v)}</b></button>`;
   $("split").classList.toggle("hidden", !txs.length);
@@ -609,9 +658,9 @@ function render() {
 
   // 圖表依國內／海外篩選後計算
   const base = twd.filter(inRegion);
-  const chartTotal = base.reduce((s, t) => s + (+t.amount || 0), 0);
+  const chartTotal = base.reduce((s, t) => s + net(t), 0);
   const byCat = {};
-  base.forEach(t => { const c = t.category || UNCAT; byCat[c] = (byCat[c] || 0) + (+t.amount || 0); });
+  base.forEach(t => { const c = t.category || UNCAT; byCat[c] = (byCat[c] || 0) + net(t); });
   const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const max = cats[0]?.[1] || 1;
   $("chart").classList.toggle("hidden", !cats.length);
@@ -626,13 +675,13 @@ function render() {
     filter = filter === b.dataset.cat ? null : b.dataset.cat; render();
   });
 
-  const parts = [region && REGION_NAME[region], filter].filter(Boolean);
+  const parts = [region && REGION_NAME[region], filter, onlyPending && "待收"].filter(Boolean);
   $("filterNote").classList.toggle("hidden", !parts.length);
   $("filterText").textContent = parts.length ? `只顯示「${parts.join("・")}」，共 NT$ ${fmt(
-    txs.filter(t => inRegion(t) && (!filter || (t.category || UNCAT) === filter) && (!t.currency || t.currency === "TWD"))
-       .reduce((s, t) => s + (+t.amount || 0), 0))}` : "";
+    txs.filter(t => inRegion(t) && (!filter || (t.category || UNCAT) === filter) && (!onlyPending || t.backPending) && (!t.currency || t.currency === "TWD"))
+       .reduce((s, t) => s + net(t), 0))}` : "";
 
-  const shown = txs.filter(t => inRegion(t) && (!filter || (t.category || UNCAT) === filter));
+  const shown = txs.filter(t => inRegion(t) && (!filter || (t.category || UNCAT) === filter) && (!onlyPending || (t.backPending && +t.paidBack > 0)));
   if (!shown.length) {
     $("list").innerHTML = `<div class="empty">還沒有任何消費。<br><button class="btn-primary" id="emptyAdd">記一筆</button></div>`;
     $("emptyAdd").onclick = () => openTx();
@@ -648,7 +697,7 @@ function renderList(shown, pool, withYear) {
   shown.forEach(t => (days[t.date] ||= []).push(t));
   $("list").innerHTML = Object.entries(days).map(([date, items]) => {
     const d = new Date(date + "T00:00:00");
-    const sum = items.filter(t => !t.currency || t.currency === "TWD").reduce((s, t) => s + (+t.amount || 0), 0);
+    const sum = items.filter(t => !t.currency || t.currency === "TWD").reduce((s, t) => s + net(t), 0);
     return `<div class="day">
       <div class="day-head"><span>${withYear ? d.getFullYear() + "/" : ""}${d.getMonth() + 1}/${d.getDate()}（${WEEK[d.getDay()]}）</span><span>NT$ ${fmt(sum)}</span></div>
       <div class="items">${items.map(t => {
@@ -657,12 +706,18 @@ function renderList(shown, pool, withYear) {
         if (t.time) bits.push(esc(t.time));
         if (t.card) bits.push("卡 " + esc(t.card));
         if (t.region && t.region !== "TW") bits.push(`<span class="tag">海外 ${esc(t.region)}</span>`);
+        if (+t.paidBack > 0) {
+          const who = t.paidBy ? esc(t.paidBy) : "別人";
+          bits.push(t.backPending
+            ? `<span class="tag owe">${who} 待收 ${fmt(t.paidBack)}</span>`
+            : `<span class="tag">${who} 分攤 ${fmt(t.paidBack)}</span>`);
+        }
         if (t.note) bits.push(esc(t.note));
         const cur = t.currency && t.currency !== "TWD" ? `<small>${esc(t.currency)} </small>` : "";
         return `<button class="item" data-id="${t.id}">
           <span class="dot" style="background:${colorOf(cat)}"></span>
           <span style="min-width:0"><div class="store">${esc(t.store || "（無名稱）")}</div><div class="sub">${bits.join("，")}</div></span>
-          <span class="amt">${cur}${fmt(t.amount)}</span>
+          <span class="amt-wrap"><span class="amt">${cur}${fmt(t.amount)}</span>${+t.paidBack > 0 ? `<span class="amt-net">實付 ${fmt(net(t))}</span>` : ""}</span>
         </button>`;
       }).join("")}</div></div>`;
   }).join("");
@@ -709,9 +764,9 @@ function renderSearch() {
     $("list").innerHTML = "";
     return;
   }
-  const hits = allTxs.filter(t => [t.store, t.note, t.category, t.bankCategory].some(v => norm(v).includes(q)));
+  const hits = allTxs.filter(t => [t.store, t.note, t.category, t.bankCategory, t.paidBy].some(v => norm(v).includes(q)));
   const twd = hits.filter(t => !t.currency || t.currency === "TWD");
-  const total = twd.reduce((s, t) => s + (+t.amount || 0), 0);
+  const total = twd.reduce((s, t) => s + net(t), 0);
   const first = hits[hits.length - 1]?.date, last = hits[0]?.date;
   $("searchSum").innerHTML = hits.length
     ? `<div class="sub2">「${esc(searchQ)}」共 ${hits.length} 筆，平均每筆 NT$ ${fmt(twd.length ? total / twd.length : 0)}</div>
@@ -779,7 +834,7 @@ async function renderTrend() {
   if (token !== trendToken) return;
 
   const pick = t => (!t.currency || t.currency === "TWD") && inRegion(t) && (!filter || (t.category || UNCAT) === filter);
-  const sumOf = arr => arr.filter(pick).reduce((s, t) => s + (+t.amount || 0), 0);
+  const sumOf = arr => arr.filter(pick).reduce((s, t) => s + net(t), 0);
   const pts = list.map(c => ({ c, v: sumOf(cycleCache[keyOf(c)] || []) }));
   const hasData = pts.some(p => p.v > 0);
   $("trend").classList.toggle("hidden", !hasData);
@@ -809,7 +864,7 @@ async function renderTrend() {
   const catSum = (arrs) => {
     const m = {};
     arrs.forEach(arr => arr.filter(t => (!t.currency || t.currency === "TWD") && inRegion(t))
-      .forEach(t => { const c = t.category || UNCAT; m[c] = (m[c] || 0) + (+t.amount || 0); }));
+      .forEach(t => { const c = t.category || UNCAT; m[c] = (m[c] || 0) + net(t); }));
     return m;
   };
   const curCat = catSum([cycleCache[keyOf(ym)] || []]);
@@ -919,7 +974,7 @@ $("yrPrev").onclick = () => { pickYear--; drawMonthGrid(); };
 $("yrNext").onclick = () => { pickYear++; drawMonthGrid(); };
 $("btnThisCycle").onclick = () => { ym = { ...CUR }; filter = null; region = null; $("dlgMonth").close(); subscribe(); };
 
-$("clearFilter").onclick = () => { filter = null; region = null; render(); };
+$("clearFilter").onclick = () => { filter = null; region = null; onlyPending = false; render(); };
 
 // ===== 新增 / 編輯 =====
 function openTx(t) {
@@ -932,6 +987,10 @@ function openTx(t) {
   fillCatSelect(t?.category);
   $("fCat").value = t?.category || "";
   $("fNote").value = t?.note || "";
+  $("fBack").value = +t?.paidBack > 0 ? t.paidBack : "";
+  $("fBackWho").value = t?.paidBy || "";
+  $("fBackPending").checked = !!t?.backPending;
+  updateBackHint();
   updateRuleBox(true);
   $("btnDelete").classList.toggle("hidden", !t);
   const info = [];
@@ -945,6 +1004,22 @@ function openTx(t) {
   if (!t) $("fAmount").focus();
 }
 $("btnAdd").onclick = () => openTx();
+
+// 別人分攤
+function updateBackHint() {
+  const amt = parseFloat($("fAmount").value) || 0, back = parseFloat($("fBack").value) || 0;
+  $("fBackHint").innerHTML = back > 0
+    ? (back > amt ? `分攤金額不能大於消費金額` : `我實際花 <b>NT$ ${fmt(amt - back)}</b>`)
+    : "有人要還你錢時填這裡，總覽會分開算「信用卡帳單」和「我實際花的」";
+}
+$("fBack").addEventListener("input", updateBackHint);
+$("fAmount").addEventListener("input", updateBackHint);
+document.querySelectorAll(".quick button").forEach(b => b.onclick = () => {
+  const amt = parseFloat($("fAmount").value) || 0;
+  $("fBack").value = b.dataset.q === "half" ? Math.round(amt / 2) : b.dataset.q === "all" ? amt : "";
+  if (b.dataset.q === "clear") { $("fBackWho").value = ""; $("fBackPending").checked = false; }
+  updateBackHint();
+});
 
 // 「以後這家店都歸到這個分類」
 function updateRuleBox(reset) {
@@ -991,8 +1066,12 @@ $("txForm").onsubmit = async e => {
     store: $("fStore").value.trim(),
     category: $("fCat").value,
     note: $("fNote").value.trim(),
+    paidBack: parseFloat($("fBack").value) || 0,
+    paidBy: $("fBackWho").value.trim(),
+    backPending: $("fBackPending").checked && (parseFloat($("fBack").value) || 0) > 0,
   };
   if (!data.date || isNaN(data.amount)) return;
+  if (data.paidBack > data.amount) return toast("分攤金額不能大於消費金額");
   $("btnSave").disabled = true;
   try {
     const col = collection(db, "users", user.uid, "transactions");
@@ -1146,8 +1225,9 @@ $("btnKeyCopy").onclick = async () => {
   catch { $("keyText").select(); toast("請手動全選後複製"); }
 };
 $("btnExport").onclick = () => {
-  const head = ["日期", "時間", "金額", "幣別", "商店", "分類", "銀行分類", "卡號後4碼", "備註", "來源"];
-  const rows = [...txs].reverse().map(t => [t.date, t.time, t.amount, t.currency || "TWD", t.store,
+  const head = ["日期", "時間", "金額", "別人分攤", "我實際花的", "分攤的人", "待收", "幣別", "商店", "分類", "銀行分類", "卡號後4碼", "備註", "來源"];
+  const rows = [...txs].reverse().map(t => [t.date, t.time, t.amount, t.paidBack || 0, net(t), t.paidBy,
+    t.backPending ? "是" : "", t.currency || "TWD", t.store,
     t.category || UNCAT, t.bankCategory, t.card, t.note, t.source === "gmail" ? "刷卡通知" : "手動"]);
   const csv = [head, ...rows].map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
   const a = document.createElement("a");
