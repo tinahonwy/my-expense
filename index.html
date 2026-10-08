@@ -309,6 +309,14 @@
     opacity: 0; transition: opacity .2s; pointer-events: none;
   }
   .toast.show { opacity: 1; }
+  .undo {
+    position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+    display: flex; align-items: center; gap: 14px; z-index: 10;
+    background: var(--ink); color: var(--paper); padding: 8px 8px 8px 18px; border-radius: 24px; font-size: 14px;
+    box-shadow: 0 8px 24px rgba(10, 20, 25, .3); white-space: nowrap;
+  }
+  .undo button { border: 0; border-radius: 18px; padding: 8px 16px; font-weight: 700; background: var(--accent); color: #fff; }
+  @media (prefers-color-scheme: dark) { .undo button { color: #0F1A1D; } }
   @media (prefers-reduced-motion: reduce) {
     .toast, .donut circle.seg, .btn-primary, .btn-ghost, .btn-cancel, .btn-danger, .x-btn { transition: none; }
     dialog[open] { animation: none; }
@@ -426,6 +434,7 @@
       <button class="btn-ghost" id="btnKey">複製自動匯入金鑰</button>
       <button class="btn-ghost" id="btnExport">匯出本期 CSV（Excel 可開）</button>
       <button class="btn-cancel" id="btnLogout">登出</button>
+
     </div>
   </div>
 </dialog>
@@ -473,13 +482,16 @@
 </dialog>
 
 <div class="toast" id="toast"></div>
+<div class="undo hidden" id="undoBar" role="status"><span id="undoText">已刪除</span><button id="btnUndo">復原</button></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, query, where, orderBy, onSnapshot,
-         addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDocs, writeBatch }
+         addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDocs, writeBatch,
+         initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+         clearIndexedDbPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -493,7 +505,25 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+// 只有手機／平板（包含加到主畫面的 App）才開本機快取，讓切換帳單期比較快；
+// 電腦不存任何資料在本機，關掉網頁就沒了，公司電腦也不用另外清除
+const IS_MOBILE =
+  navigator.userAgentData?.mobile ||
+  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ||   // iPad 桌面模式
+  matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let db;
+if (IS_MOBILE) {
+  try {
+    db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+  } catch (e) {
+    db = getFirestore(app);
+  }
+} else {
+  db = getFirestore(app);
+  // 清掉舊版可能留在這台電腦的資料
+  try { await clearIndexedDbPersistence(db); } catch (e) {}
+}
 
 // 預設分類與顏色（可在網頁選單「管理分類」自訂，會存在雲端）
 const DEFAULT_CATEGORIES = [
@@ -608,7 +638,15 @@ function subscribe() {
   const start = r.start, next = r.end;
   const q = query(collection(db, "users", user.uid, "transactions"),
     where("date", ">=", start), where("date", "<", next), orderBy("date", "desc"));
-  $("list").innerHTML = `<div class="empty">載入中…</div>`;
+  const cached = cycleCache[keyOf(ym)];
+  if (cached) {
+    // 已經預先載入過這一期（趨勢圖會順便載入前幾期），直接先顯示
+    txs = [...cached].sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
+    render();
+  } else {
+    $("total").textContent = "…";
+    $("list").innerHTML = `<div class="empty">載入中…</div>`;
+  }
   unsub = onSnapshot(q, snap => {
     txs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
@@ -827,7 +865,7 @@ async function loadCycles(list) {
   const fresh = {};
   missing.forEach(c => fresh[keyOf(c)] = []);
   snap.docs.forEach(d => {
-    const t = d.data();
+    const t = { id: d.id, ...d.data() };
     const k = keyOf(cycleOf(...t.date.split("-").map(Number)));
     if (fresh[k]) fresh[k].push(t);
   });
@@ -842,6 +880,11 @@ async function renderTrend() {
   cycleCache[keyOf(ym)] = txs;                  // 本期用即時資料
   try { await loadCycles(list); } catch (e) { return; }
   if (token !== trendToken) return;
+  // 順便預先載入下一期和更早一期，按箭頭時就能馬上顯示
+  const nextC = backCycles(ym, -1), olderC = backCycles(ym, trendN);
+  const ahead = [olderC];
+  if (nextC.y < CUR.y || (nextC.y === CUR.y && nextC.m <= CUR.m)) ahead.push(nextC);
+  ahead.forEach(c => loadCycles([c]).catch(() => {}));
 
   const pick = t => (!t.currency || t.currency === "TWD") && inRegion(t) && (!filter || (t.category || UNCAT) === filter);
   const sumOf = arr => arr.filter(pick).reduce((s, t) => s + net(t), 0);
@@ -1116,11 +1159,36 @@ $("txForm").onsubmit = async e => {
 
 $("btnDelete").onclick = async () => {
   if (!editingId || !confirm("確定要刪除這筆消費嗎？")) return;
-  await deleteDoc(doc(db, "users", user.uid, "transactions", editingId));
+  const id = editingId;
+  const old = (searching ? allTxs : txs).find(t => t.id === id) || txs.find(t => t.id === id);
+  const { id: _omit, ...backup } = old || {};
+  await deleteDoc(doc(db, "users", user.uid, "transactions", id));
   $("dlgTx").close();
-  toast("已刪除");
   cycleCache = {};
-  if (searching) { allTxs = allTxs.filter(t => t.id !== editingId); renderSearch(); }
+  if (searching) { allTxs = allTxs.filter(t => t.id !== id); renderSearch(); }
+  if (old) showUndo(`已刪除「${old.store || "這筆消費"}」`, async () => {
+    await setDoc(doc(db, "users", user.uid, "transactions", id), backup);
+    cycleCache = {};
+    if (searching) { await loadAll(); renderSearch(); }
+    toast("已復原");
+  });
+};
+
+// 「復原」提示，8 秒後消失
+let undoTimer, undoFn = null;
+function showUndo(text, fn) {
+  undoFn = fn;
+  $("undoText").textContent = text.length > 18 ? text.slice(0, 17) + "…」" : text;
+  $("undoBar").classList.remove("hidden");
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => { $("undoBar").classList.add("hidden"); undoFn = null; }, 8000);
+}
+$("btnUndo").onclick = async () => {
+  const fn = undoFn;
+  undoFn = null;
+  clearTimeout(undoTimer);
+  $("undoBar").classList.add("hidden");
+  if (fn) { try { await fn(); } catch (err) { toast("復原失敗：" + err.code); } }
 };
 
 // ===== 選單 =====
