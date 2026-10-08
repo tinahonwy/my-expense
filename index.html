@@ -81,6 +81,10 @@
   .total { font-family: var(--num); font-weight: 700; font-size: clamp(52px, 15vw, 76px); line-height: 1; letter-spacing: -.5px; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
   .total small { font-size: .4em; font-weight: 600; color: var(--muted); margin-right: 6px; letter-spacing: 0; }
   .meta { color: var(--muted); font-size: 14px; }
+  .split { display: flex; gap: 24px; margin-top: 14px; }
+  .split div { font-size: 13px; color: var(--muted); }
+  .split b { display: block; font-family: var(--num); font-size: 22px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .tag { display: inline-block; font-size: 12px; line-height: 1.5; padding: 0 6px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); }
   .chart { margin-top: 20px; border-top: 1px dashed var(--line); padding-top: 20px; display: grid; gap: 18px; }
   .donut { width: 180px; height: 180px; justify-self: center; display: block; }
   .donut circle.seg { cursor: pointer; transition: opacity .15s; }
@@ -182,6 +186,7 @@
     <div class="receipt-label">本期支出</div>
     <div class="total"><small>NT$</small><span id="total">0</span></div>
     <div class="meta" id="meta"></div>
+    <div class="split hidden" id="split"></div>
     <div class="chart" id="chart">
       <svg class="donut" id="donut" viewBox="0 0 180 180" role="img" aria-label="各分類支出比例"></svg>
       <div class="bars" id="bars"></div>
@@ -370,6 +375,11 @@ function render() {
     ? `共 ${txs.length} 筆` + (foreign ? `，另有 ${foreign} 筆外幣未計入` : "")
     : "這一期還沒有紀錄";
 
+  const isAbroad = t => t.region && t.region !== "TW";
+  const abroad = twd.filter(isAbroad).reduce((s, t) => s + (+t.amount || 0), 0);
+  $("split").classList.toggle("hidden", !txs.length);
+  $("split").innerHTML = `<div>國內<b>${fmt(total - abroad)}</b></div><div>海外<b>${fmt(abroad)}</b></div>`;
+
   const byCat = {};
   twd.forEach(t => { const c = t.category || UNCAT; byCat[c] = (byCat[c] || 0) + (+t.amount || 0); });
   const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
@@ -407,6 +417,7 @@ function render() {
         const bits = [`<span class="${t.category ? "" : "uncat"}">${esc(cat)}</span>`];
         if (t.time) bits.push(esc(t.time));
         if (t.card) bits.push("卡 " + esc(t.card));
+        if (t.region && t.region !== "TW") bits.push(`<span class="tag">海外 ${esc(t.region)}</span>`);
         if (t.note) bits.push(esc(t.note));
         const cur = t.currency && t.currency !== "TWD" ? `<small>${esc(t.currency)} </small>` : "";
         return `<button class="item" data-id="${t.id}">
@@ -459,6 +470,7 @@ function openTx(t) {
   if (t?.source === "gmail") info.push("由刷卡通知信自動匯入");
   if (t?.bankCategory) info.push("銀行分類：" + t.bankCategory);
   if (t?.card) info.push("卡號後 4 碼：" + t.card);
+  if (t?.region) info.push("消費地區：" + t.region);
   $("fInfo").textContent = info.join("，");
   $("fInfo").classList.toggle("hidden", !info.length);
   $("dlgTx").showModal();
