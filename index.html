@@ -628,7 +628,10 @@ function render() {
   const foreign = txs.length - twd.length;
   const total = twd.reduce((s, t) => s + net(t), 0);
   const gross = twd.reduce((s, t) => s + (+t.amount || 0), 0);
-  const card = twd.filter(t => t.source === "gmail").reduce((s, t) => s + (+t.amount || 0), 0);
+  const cardTxs = twd.filter(t => t.source === "gmail");
+  const card = cardTxs.reduce((s, t) => s + (+t.amount || 0), 0);
+  const byBank = {};                                // 舊紀錄沒有 bank 欄位，都是國泰
+  cardTxs.forEach(t => { const b = t.bank || "國泰"; byBank[b] = (byBank[b] || 0) + (+t.amount || 0); });
   const back = gross - total;
   const pendingList = twd.filter(t => t.backPending && +t.paidBack > 0);
   const pending = pendingList.reduce((s, t) => s + (+t.paidBack || 0), 0);
@@ -639,7 +642,7 @@ function render() {
     : "這一期還沒有紀錄";
   $("billRow").classList.toggle("hidden", !txs.length);
   $("billRow").innerHTML =
-    `<span>信用卡帳單<b>${fmt(card)}</b></span>` +
+    Object.entries(byBank).sort((a, b) => b[1] - a[1]).map(([b, v]) => `<span>${esc(b)}信用卡<b>${fmt(v)}</b></span>`).join("") +
     (gross !== card ? `<span>全部紀錄<b>${fmt(gross)}</b></span>` : "") +
     (back ? `<span>別人分攤<b>${fmt(back)}</b></span>` : "") +
     (pending ? `<button id="btnPending" class="${onlyPending ? "on" : ""}">待收<b>${fmt(pending)}</b></button>` : "");
@@ -994,7 +997,7 @@ function openTx(t) {
   updateRuleBox(true);
   $("btnDelete").classList.toggle("hidden", !t);
   const info = [];
-  if (t?.source === "gmail") info.push("由刷卡通知信自動匯入");
+  if (t?.source === "gmail") info.push(`由${t.bank || "國泰"}刷卡通知信自動匯入`);
   if (t?.bankCategory) info.push("銀行分類：" + t.bankCategory);
   if (t?.card) info.push("卡號後 4 碼：" + t.card);
   if (t?.region) info.push("消費地區：" + t.region);
@@ -1226,9 +1229,10 @@ $("btnKeyCopy").onclick = async () => {
 };
 $("btnExport").onclick = () => {
   const head = ["日期", "時間", "金額", "別人分攤", "我實際花的", "分攤的人", "待收", "幣別", "商店", "分類", "銀行分類", "卡號後4碼", "備註", "來源"];
+  const src = t => t.source === "gmail" ? `${t.bank || "國泰"}信用卡` : "手動";
   const rows = [...txs].reverse().map(t => [t.date, t.time, t.amount, t.paidBack || 0, net(t), t.paidBy,
     t.backPending ? "是" : "", t.currency || "TWD", t.store,
-    t.category || UNCAT, t.bankCategory, t.card, t.note, t.source === "gmail" ? "刷卡通知" : "手動"]);
+    t.category || UNCAT, t.bankCategory, t.card, t.note, src(t)]);
   const csv = [head, ...rows].map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
