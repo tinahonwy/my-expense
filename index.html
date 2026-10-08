@@ -155,6 +155,12 @@
   .info { font-size: 13px; color: var(--muted); background: var(--bg); border-radius: 10px; padding: 10px 12px; }
   .uid { font-family: var(--num); font-size: 15px; word-break: break-all; color: var(--ink); }
   .menu-list { display: grid; gap: 8px; }
+  .cat-list { display: grid; gap: 8px; max-height: 50vh; overflow-y: auto; padding: 2px; }
+  .cat-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 8px; align-items: center; }
+  .cat-row input[type=color] { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 10px; padding: 3px; background: var(--bg); cursor: pointer; }
+  .cat-row input[type=text] { border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--bg); min-width: 0; width: 100%; }
+  .cat-row button { background: none; border: 0; color: var(--danger); padding: 8px; font-size: 14px; }
+  .cat-hint { font-size: 13px; color: var(--muted); margin: 0; }
   .menu-list button { text-align: left; }
 
   .toast {
@@ -230,10 +236,24 @@
   <div class="dlg">
     <h3 id="menuName"></h3>
     <div class="menu-list">
+      <button class="btn-ghost" id="btnCats">管理分類</button>
       <button class="btn-ghost" id="btnKey">複製自動匯入金鑰</button>
       <button class="btn-ghost" id="btnExport">匯出本期 CSV（Excel 可開）</button>
       <button class="btn-ghost" id="btnLogout">登出</button>
       <button class="btn-ghost" id="btnCloseMenu">關閉</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgCats">
+  <div class="dlg">
+    <h3>管理分類</h3>
+    <p class="cat-hint">點色塊換顏色。改名會一併更新所有用到這個分類的紀錄；刪除後，那些紀錄會變成「未分類」。</p>
+    <div class="cat-list" id="catList"></div>
+    <button class="btn-ghost" id="btnCatAdd">＋ 新增分類</button>
+    <div class="dlg-actions">
+      <button class="btn-ghost" id="btnCatCancel">取消</button>
+      <button class="btn-primary" id="btnCatSave">儲存</button>
     </div>
   </div>
 </dialog>
@@ -260,7 +280,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, query, where, orderBy, onSnapshot,
-         addDoc, updateDoc, deleteDoc, doc, serverTimestamp }
+         addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDocs, writeBatch }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -276,12 +296,15 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// 分類與顏色（可自行增減）
-const CATEGORIES = [
+// 預設分類與顏色（可在網頁選單「管理分類」自訂，會存在雲端）
+const DEFAULT_CATEGORIES = [
   ["餐飲", "#E07A2E"], ["日常生活", "#2E8B57"], ["購物", "#C2417A"],
   ["交通", "#2F6FB3"], ["訂閱", "#7A5BC2"], ["娛樂", "#D4A21E"],
   ["居住", "#5B7C8A"], ["醫療", "#C94A3F"], ["寵物", "#9C6B3F"], ["其他", "#8A8F86"],
 ];
+let CATEGORIES = DEFAULT_CATEGORIES;
+let unsubCats = null;
+const PALETTE = ["#E07A2E", "#2E8B57", "#C2417A", "#2F6FB3", "#7A5BC2", "#D4A21E", "#5B7C8A", "#C94A3F", "#9C6B3F", "#3A9E9A", "#B8578E", "#6B8E23"];
 const UNCAT = "未分類";
 const colorOf = c => (CATEGORIES.find(x => x[0] === c) || [, "#B9C0BC"])[1];
 
@@ -315,8 +338,13 @@ const inRegion = t => !region || (region === "abroad") === isAbroad(t);
 const now = new Date();
 let ym = cycleOf(now.getFullYear(), now.getMonth() + 1, now.getDate());
 
-$("fCat").innerHTML = `<option value="">${UNCAT}</option>` +
-  CATEGORIES.map(([c]) => `<option>${c}</option>`).join("");
+function fillCatSelect(current) {
+  const names = CATEGORIES.map(([c]) => c);
+  if (current && !names.includes(current)) names.push(current);
+  $("fCat").innerHTML = `<option value="">${UNCAT}</option>` +
+    names.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+}
+fillCatSelect();
 
 // ===== 登入 =====
 $("btnLogin").onclick = async () => {
@@ -341,8 +369,17 @@ onAuthStateChanged(auth, u => {
   if (u) {
     $("avatarImg").src = u.photoURL || "";
     $("menuName").textContent = u.displayName || u.email;
+    unsubCats = onSnapshot(doc(db, "users", u.uid, "settings", "categories"), snap => {
+      const list = snap.exists() && snap.data().list;
+      CATEGORIES = Array.isArray(list) && list.length ? list.map(x => [x.name, x.color]) : DEFAULT_CATEGORIES;
+      fillCatSelect();
+      if (txs.length) render();
+    });
     subscribe();
-  } else if (unsub) { unsub(); unsub = null; }
+  } else {
+    if (unsub) { unsub(); unsub = null; }
+    if (unsubCats) { unsubCats(); unsubCats = null; }
+  }
 });
 
 // ===== 讀取當月資料（即時同步） =====
@@ -483,6 +520,7 @@ function openTx(t) {
   $("fDate").value = t?.date || `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
   $("fAmount").value = t?.amount ?? "";
   $("fStore").value = t?.store || "";
+  fillCatSelect(t?.category);
   $("fCat").value = t?.category || "";
   $("fNote").value = t?.note || "";
   $("btnDelete").classList.toggle("hidden", !t);
@@ -539,6 +577,74 @@ $("btnDelete").onclick = async () => {
 // ===== 選單 =====
 $("btnMenu").onclick = () => $("dlgMenu").showModal();
 $("btnCloseMenu").onclick = () => $("dlgMenu").close();
+// ===== 管理分類 =====
+function catRow(name = "", color, orig = "") {
+  const row = document.createElement("div");
+  row.className = "cat-row";
+  row.dataset.orig = orig;
+  row.innerHTML = `
+    <input type="color" value="${color || PALETTE[$("catList").children.length % PALETTE.length]}" aria-label="顏色">
+    <input type="text" value="${esc(name)}" placeholder="分類名稱" maxlength="12" aria-label="分類名稱">
+    <button type="button">刪除</button>`;
+  row.querySelector("button").onclick = () => row.remove();
+  return row;
+}
+$("btnCats").onclick = () => {
+  $("dlgMenu").close();
+  $("catList").innerHTML = "";
+  CATEGORIES.forEach(([n, c]) => $("catList").append(catRow(n, c, n)));
+  $("dlgCats").showModal();
+};
+$("btnCatAdd").onclick = () => {
+  const row = catRow();
+  $("catList").append(row);
+  row.querySelector("input[type=text]").focus();
+};
+$("btnCatCancel").onclick = () => $("dlgCats").close();
+
+async function relabel(from, to) {
+  const snap = await getDocs(query(collection(db, "users", user.uid, "transactions"), where("category", "==", from)));
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    const batch = writeBatch(db);
+    snap.docs.slice(i, i + 400).forEach(d => batch.update(d.ref, { category: to }));
+    await batch.commit();
+  }
+  return snap.size;
+}
+
+$("btnCatSave").onclick = async () => {
+  const rows = [...$("catList").children].map(r => ({
+    orig: r.dataset.orig,
+    name: r.querySelector("input[type=text]").value.trim(),
+    color: r.querySelector("input[type=color]").value,
+  })).filter(r => r.name);
+
+  const names = rows.map(r => r.name);
+  if (!rows.length) return toast("至少要保留一個分類");
+  if (names.includes(UNCAT)) return toast(`「${UNCAT}」是保留名稱，請換一個`);
+  if (new Set(names).size !== names.length) return toast("分類名稱重複了");
+
+  const renamed = rows.filter(r => r.orig && r.orig !== r.name);
+  const kept = new Set(rows.map(r => r.orig).filter(Boolean));
+  const removed = CATEGORIES.map(([n]) => n).filter(n => !kept.has(n));
+  if (removed.length && !confirm(`要刪除「${removed.join("、")}」嗎？用到這些分類的紀錄會變成「${UNCAT}」。`)) return;
+
+  $("btnCatSave").disabled = true;
+  try {
+    for (const r of renamed) await relabel(r.orig, r.name);
+    for (const n of removed) await relabel(n, "");
+    await setDoc(doc(db, "users", user.uid, "settings", "categories"),
+      { list: rows.map(r => ({ name: r.name, color: r.color })), updatedAt: serverTimestamp() });
+    if (filter && !names.includes(filter)) filter = null;
+    $("dlgCats").close();
+    toast("分類已儲存");
+  } catch (err) {
+    toast("儲存失敗：" + err.code);
+  } finally {
+    $("btnCatSave").disabled = false;
+  }
+};
+
 $("btnLogout").onclick = () => { $("dlgMenu").close(); signOut(auth); };
 $("btnKey").onclick = () => {
   $("dlgMenu").close();
