@@ -82,6 +82,27 @@
   .month button:hover { background: var(--paper); }
   .month h2 { margin: 0; font-size: 17px; font-weight: 700; min-width: 150px; text-align: center; line-height: 1.3; }
   .month .cycle { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .top-actions { display: flex; align-items: center; gap: 8px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 0; background: none; color: var(--ink); display: grid; place-items: center; }
+  .icon-btn:hover { background: var(--paper); }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .searchbar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .searchbar input {
+    flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px;
+    background: var(--paper); font-size: 16px;
+  }
+  .searchbar input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .search-sum { background: var(--paper); border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; }
+  .search-sum .big { font-family: var(--num); font-size: 34px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .search-sum .big small { font-size: .45em; color: var(--muted); margin-right: 4px; }
+  .search-sum .sub2 { font-size: 13px; color: var(--muted); }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
+  .rule-list { display: grid; gap: 6px; max-height: 30vh; overflow-y: auto; }
+  .rule-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; padding: 8px 12px; background: var(--bg); border-radius: 10px; }
+  .rule-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rule-row button { background: none; border: 0; color: var(--danger); font-size: 13px; flex: none; padding: 4px; }
+  .sec-title { font-size: 15px; font-weight: 700; margin: 8px 0 0; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 0; overflow: hidden; background: var(--line); }
   .avatar img { width: 100%; height: 100%; object-fit: cover; }
 
@@ -234,10 +255,19 @@
       <h2 id="monthLabel"></h2>
       <button id="nextMonth" aria-label="下一期">›</button>
     </div>
-    <button class="avatar" id="btnMenu" aria-label="選單"><img id="avatarImg" alt=""></button>
+    <div class="top-actions">
+      <button class="icon-btn" id="btnSearch" aria-label="搜尋"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8.5" cy="8.5" r="6"/><path d="M13 13l5 5"/></svg></button>
+      <button class="avatar" id="btnMenu" aria-label="選單"><img id="avatarImg" alt=""></button>
+    </div>
   </div>
 
-  <section class="receipt">
+  <div class="searchbar hidden" id="searchBar">
+    <input id="searchInput" type="search" placeholder="搜尋商店、備註或分類，例如：UNIQLO" autocomplete="off">
+    <button class="btn-cancel" id="btnSearchClose">取消</button>
+  </div>
+  <div id="searchSum" class="search-sum hidden"></div>
+
+  <section class="receipt" id="receipt">
     <div class="receipt-label">本期支出</div>
     <div class="total"><small>NT$</small><span id="total">0</span></div>
     <div class="meta" id="meta"></div>
@@ -270,6 +300,7 @@
       <select id="fCat"></select>
       <small>想新增、改名或刪除分類，點右上方「管理分類」，或從右上角頭像 →「管理分類」進入。</small>
     </div>
+    <label class="check hidden" id="ruleBox"><input type="checkbox" id="fRule"><span id="ruleText"></span></label>
     <div class="field"><label for="fNote">備註</label><input id="fNote" placeholder="選填"></div>
     <div class="info hidden" id="fInfo"></div>
     <div class="dlg-actions">
@@ -298,6 +329,11 @@
     <p class="cat-hint">點色塊換顏色。改名會一併更新所有用到這個分類的紀錄；刪除後，那些紀錄會變成「未分類」。</p>
     <div class="cat-list" id="catList"></div>
     <button class="btn-ghost" id="btnCatAdd">＋ 新增分類</button>
+    <div id="ruleSec">
+      <p class="sec-title">店家自動分類</p>
+      <p class="cat-hint">在消費紀錄勾選「以後這家店都歸到這個分類」就會加到這裡。刪除規則不會改動已經分好的紀錄。</p>
+      <div class="rule-list" id="ruleList"></div>
+    </div>
     <div class="dlg-actions">
       <button class="btn-cancel" id="btnCatCancel">取消</button>
       <button class="btn-primary" id="btnCatSave">儲存</button>
@@ -379,6 +415,8 @@ function cycleRange({ y, m }) {
 }
 
 let user = null, unsub = null, txs = [], filter = null, region = null, editingId = null;
+let storeRules = {}, unsubRules = null;       // 店家 → 分類
+let searching = false, allTxs = null, searchQ = "";
 const isAbroad = t => !!t.region && t.region !== "TW";
 const REGION_NAME = { domestic: "國內", abroad: "海外" };
 const inRegion = t => !region || (region === "abroad") === isAbroad(t);
@@ -424,10 +462,16 @@ onAuthStateChanged(auth, u => {
       fillCatSelect();
       if (txs.length) render();
     });
+    unsubRules = onSnapshot(doc(db, "users", u.uid, "settings", "storeRules"), snap => {
+      storeRules = {};
+      ((snap.exists() && snap.data().list) || []).forEach(r => { if (r.store) storeRules[r.store] = r.category; });
+      if ($("dlgCats").open) renderRules();
+    });
     subscribe();
   } else {
     if (unsub) { unsub(); unsub = null; }
     if (unsubCats) { unsubCats(); unsubCats = null; }
+    if (unsubRules) { unsubRules(); unsubRules = null; }
   }
 });
 
@@ -461,6 +505,7 @@ $("nextMonth").onclick = () => shiftMonth(1);
 
 // ===== 畫面 =====
 function render() {
+  if (searching) return renderSearch();
   const twd = txs.filter(t => !t.currency || t.currency === "TWD");
   const foreign = txs.length - twd.length;
   const total = twd.reduce((s, t) => s + (+t.amount || 0), 0);
@@ -511,13 +556,17 @@ function render() {
     $("emptyAdd").onclick = () => openTx();
     return;
   }
+  renderList(shown, txs, false);
+}
+
+function renderList(shown, pool, withYear) {
   const days = {};
   shown.forEach(t => (days[t.date] ||= []).push(t));
   $("list").innerHTML = Object.entries(days).map(([date, items]) => {
     const d = new Date(date + "T00:00:00");
     const sum = items.filter(t => !t.currency || t.currency === "TWD").reduce((s, t) => s + (+t.amount || 0), 0);
     return `<div class="day">
-      <div class="day-head"><span>${d.getMonth() + 1}/${d.getDate()}（${WEEK[d.getDay()]}）</span><span>NT$ ${fmt(sum)}</span></div>
+      <div class="day-head"><span>${withYear ? d.getFullYear() + "/" : ""}${d.getMonth() + 1}/${d.getDate()}（${WEEK[d.getDay()]}）</span><span>NT$ ${fmt(sum)}</span></div>
       <div class="items">${items.map(t => {
         const cat = t.category || UNCAT;
         const bits = [`<span class="${t.category ? "" : "uncat"}">${esc(cat)}</span>`];
@@ -533,8 +582,67 @@ function render() {
         </button>`;
       }).join("")}</div></div>`;
   }).join("");
-  $("list").querySelectorAll(".item").forEach(el => el.onclick = () => openTx(txs.find(t => t.id === el.dataset.id)));
+  $("list").querySelectorAll(".item").forEach(el => el.onclick = () => openTx(pool.find(t => t.id === el.dataset.id)));
 }
+
+// ===== 搜尋（跨所有帳單期） =====
+const norm = s => String(s || "")
+  .replace(/[\uFF01-\uFF5E]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+  .replace(/\s+/g, "").toLowerCase();
+
+async function loadAll() {
+  const snap = await getDocs(collection(db, "users", user.uid, "transactions"));
+  allTxs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
+}
+
+function setSearchMode(on) {
+  searching = on;
+  $("searchBar").classList.toggle("hidden", !on);
+  $("searchSum").classList.toggle("hidden", !on);
+  $("receipt").classList.toggle("hidden", on);
+  document.querySelector(".month").style.visibility = on ? "hidden" : "";
+  $("btnSearch").classList.toggle("hidden", on);
+  if (on) {
+    $("filterNote").classList.add("hidden");
+    $("searchInput").value = searchQ = "";
+    $("searchInput").focus();
+    $("searchSum").innerHTML = `<div class="sub2">載入所有紀錄中…</div>`;
+    $("list").innerHTML = "";
+    loadAll().then(renderSearch).catch(err => toast("讀取失敗：" + err.code));
+  } else {
+    allTxs = null;
+    render();
+  }
+}
+
+function renderSearch() {
+  if (!searching || !allTxs) return;
+  const q = norm(searchQ);
+  if (!q) {
+    $("searchSum").innerHTML = `<div class="sub2">輸入關鍵字，會從全部 ${allTxs.length} 筆紀錄中搜尋。</div>`;
+    $("list").innerHTML = "";
+    return;
+  }
+  const hits = allTxs.filter(t => [t.store, t.note, t.category, t.bankCategory].some(v => norm(v).includes(q)));
+  const twd = hits.filter(t => !t.currency || t.currency === "TWD");
+  const total = twd.reduce((s, t) => s + (+t.amount || 0), 0);
+  const first = hits[hits.length - 1]?.date, last = hits[0]?.date;
+  $("searchSum").innerHTML = hits.length
+    ? `<div class="sub2">「${esc(searchQ)}」共 ${hits.length} 筆，平均每筆 NT$ ${fmt(twd.length ? total / twd.length : 0)}</div>
+       <div class="big"><small>NT$</small>${fmt(total)}</div>
+       <div class="sub2">${first.replaceAll("-", "/")} – ${last.replaceAll("-", "/")}</div>`
+    : `<div class="sub2">找不到符合「${esc(searchQ)}」的紀錄。</div>`;
+  renderList(hits, allTxs, true);
+}
+
+$("btnSearch").onclick = () => setSearchMode(true);
+$("btnSearchClose").onclick = () => setSearchMode(false);
+let searchTimer;
+$("searchInput").oninput = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { searchQ = $("searchInput").value.trim(); renderSearch(); }, 150);
+};
 function renderDonut(cats, total) {
   const R = 66, C = 2 * Math.PI * R;
   let acc = 0;
@@ -572,6 +680,7 @@ function openTx(t) {
   fillCatSelect(t?.category);
   $("fCat").value = t?.category || "";
   $("fNote").value = t?.note || "";
+  updateRuleBox(true);
   $("btnDelete").classList.toggle("hidden", !t);
   const info = [];
   if (t?.source === "gmail") info.push("由刷卡通知信自動匯入");
@@ -584,6 +693,42 @@ function openTx(t) {
   if (!t) $("fAmount").focus();
 }
 $("btnAdd").onclick = () => openTx();
+
+// 「以後這家店都歸到這個分類」
+function updateRuleBox(reset) {
+  const store = $("fStore").value.trim();
+  const has = store && storeRules[store] !== undefined;
+  $("ruleBox").classList.toggle("hidden", !store);
+  if (reset) $("fRule").checked = !!has;
+  const cat = $("fCat").value;
+  $("ruleText").textContent = cat
+    ? `以後「${store}」都自動歸到「${cat}」，並更新過去同一家店的紀錄`
+    : `以後「${store}」不自動分類`;
+}
+$("fStore").addEventListener("input", () => {
+  const store = $("fStore").value.trim();
+  if (!editingId && storeRules[store] && !$("fCat").value) { fillCatSelect(storeRules[store]); $("fCat").value = storeRules[store]; }
+  updateRuleBox(true);
+});
+$("fCat").addEventListener("change", () => updateRuleBox(false));
+
+async function saveStoreRule(store, category) {
+  const next = { ...storeRules };
+  if (category) next[store] = category; else delete next[store];
+  await setDoc(doc(db, "users", user.uid, "settings", "storeRules"),
+    { list: Object.entries(next).map(([s, c]) => ({ store: s, category: c })), updatedAt: serverTimestamp() });
+  storeRules = next;
+}
+async function applyStoreToPast(store, category) {
+  const snap = await getDocs(query(collection(db, "users", user.uid, "transactions"), where("store", "==", store)));
+  const docs = snap.docs.filter(d => (d.data().category || "") !== category);
+  for (let i = 0; i < docs.length; i += 400) {
+    const batch = writeBatch(db);
+    docs.slice(i, i + 400).forEach(d => batch.update(d.ref, { category }));
+    await batch.commit();
+  }
+  return docs.length;
+}
 $("btnCancel").onclick = () => $("dlgTx").close();
 
 $("txForm").onsubmit = async e => {
@@ -601,12 +746,23 @@ $("txForm").onsubmit = async e => {
     const col = collection(db, "users", user.uid, "transactions");
     if (editingId) {
       await updateDoc(doc(col, editingId), { ...data, updatedAt: serverTimestamp() });
-      toast("已儲存");
     } else {
       await addDoc(col, { ...data, currency: "TWD", source: "manual", createdAt: serverTimestamp() });
-      toast("已新增");
     }
+    let msg = editingId ? "已儲存" : "已新增";
+    if (data.store) {
+      const had = storeRules[data.store] !== undefined;
+      if ($("fRule").checked && data.category) {
+        if (storeRules[data.store] !== data.category) await saveStoreRule(data.store, data.category);
+        const n = await applyStoreToPast(data.store, data.category);
+        if (n) msg += `，另外更新了 ${n} 筆同一家店的紀錄`;
+      } else if (had && (!$("fRule").checked || !data.category)) {
+        await saveStoreRule(data.store, "");
+      }
+    }
+    toast(msg);
     $("dlgTx").close();
+    if (searching) { await loadAll(); renderSearch(); return; }
     const c = cycleOf(...data.date.split("-").map(Number));
     if (c.y !== ym.y || c.m !== ym.m) { ym = c; subscribe(); }
   } catch (err) {
@@ -621,6 +777,7 @@ $("btnDelete").onclick = async () => {
   await deleteDoc(doc(db, "users", user.uid, "transactions", editingId));
   $("dlgTx").close();
   toast("已刪除");
+  if (searching) { allTxs = allTxs.filter(t => t.id !== editingId); renderSearch(); }
 };
 
 // ===== 選單 =====
@@ -644,7 +801,20 @@ function openCats() {
   if ($("dlgMenu").open) $("dlgMenu").close();
   $("catList").innerHTML = "";
   CATEGORIES.forEach(([n, c]) => $("catList").append(catRow(n, c, n)));
+  renderRules();
   $("dlgCats").showModal();
+}
+function renderRules() {
+  const entries = Object.entries(storeRules).sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]));
+  $("ruleSec").classList.toggle("hidden", !entries.length);
+  $("ruleList").innerHTML = entries.map(([s, c]) => `
+    <div class="rule-row"><span>${esc(s)} → <b style="color:${colorOf(c)}">${esc(c)}</b></span>
+    <button type="button" data-store="${esc(s)}">刪除規則</button></div>`).join("");
+  $("ruleList").querySelectorAll("button").forEach(b => b.onclick = async () => {
+    await saveStoreRule(b.dataset.store, "");
+    renderRules();
+    toast("已刪除規則");
+  });
 }
 $("btnCats").onclick = openCats;
 $("btnCatsInline").onclick = openCats;
@@ -686,6 +856,17 @@ $("btnCatSave").onclick = async () => {
   try {
     for (const r of renamed) await relabel(r.orig, r.name);
     for (const n of removed) await relabel(n, "");
+    // 店家規則跟著分類改名／刪除
+    const renameMap = Object.fromEntries(renamed.map(r => [r.orig, r.name]));
+    const nextRules = {};
+    Object.entries(storeRules).forEach(([st, c]) => {
+      if (removed.includes(c)) return;
+      nextRules[st] = renameMap[c] || c;
+    });
+    if (JSON.stringify(nextRules) !== JSON.stringify(storeRules)) {
+      await setDoc(doc(db, "users", user.uid, "settings", "storeRules"),
+        { list: Object.entries(nextRules).map(([st, c]) => ({ store: st, category: c })), updatedAt: serverTimestamp() });
+    }
     await setDoc(doc(db, "users", user.uid, "settings", "categories"),
       { list: rows.map(r => ({ name: r.name, color: r.color })), updatedAt: serverTimestamp() });
     if (filter && !names.includes(filter)) filter = null;
