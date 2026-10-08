@@ -80,7 +80,59 @@
   .month { display: flex; align-items: center; gap: 4px; }
   .month button { background: none; border: 0; font-size: 22px; width: 40px; height: 40px; border-radius: 50%; }
   .month button:hover { background: var(--paper); }
-  .month h2 { margin: 0; font-size: 17px; font-weight: 700; min-width: 150px; text-align: center; line-height: 1.3; }
+  .month .month-pick {
+    width: auto; height: auto; border-radius: 12px; padding: 4px 10px; min-width: 150px;
+    font-size: 17px; font-weight: 700; text-align: center; line-height: 1.3; color: var(--ink);
+  }
+  .month .month-pick .caret { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+
+  /* 消費趨勢 */
+  .trend { background: var(--paper); border-radius: 12px; padding: 18px 18px 14px; margin-bottom: 22px; }
+  .trend-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .trend-head h3 { margin: 0; font-size: 16px; }
+  .trend-scope { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .seg { display: inline-flex; background: var(--bg); border-radius: 10px; padding: 3px; }
+  .seg button { border: 0; background: none; padding: 5px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); }
+  .seg button.on { background: var(--paper); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .trend-chart { position: relative; margin-top: 12px; }
+  .trend-chart svg { display: block; width: 100%; height: 200px; overflow: visible; }
+  .trend-chart .grid { stroke: var(--line); stroke-width: 1; }
+  .trend-chart .axis-t { font: 12px var(--text); fill: var(--muted); }
+  .trend-chart .avg { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 4; }
+  .trend-chart .avg-t { font: 12px var(--text); fill: var(--muted); paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round; }
+  .trend-chart .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .trend-chart .area { fill: var(--accent); opacity: .08; }
+  .trend-chart .pt { fill: var(--accent); stroke: var(--paper); stroke-width: 2; }
+  .trend-chart .pt.cur { fill: var(--paper); stroke: var(--accent); stroke-width: 3; }
+  .trend-chart .hit { fill: transparent; cursor: pointer; }
+  .trend-chart .guide { stroke: var(--muted); stroke-width: 1; opacity: 0; }
+  .tip {
+    position: absolute; top: 0; pointer-events: none; transform: translate(-50%, -110%);
+    background: var(--ink); color: var(--paper); border-radius: 8px; padding: 6px 10px;
+    font-size: 13px; white-space: nowrap; opacity: 0; transition: opacity .1s;
+  }
+  .tip b { font-family: var(--num); font-size: 16px; }
+  .trend-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .trend-stats div { font-size: 12px; color: var(--muted); min-width: 0; }
+  .trend-stats b { display: block; font-family: var(--num); font-size: 19px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .trend-stats small { display: block; font-size: 12px; }
+  .movers { margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .movers span { display: inline-flex; align-items: center; gap: 5px; margin: 4px 12px 0 0; color: var(--ink); }
+  .movers i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  /* 選擇年月 */
+  .yr { display: flex; justify-content: space-between; align-items: center; }
+  .yr b { font-size: 18px; }
+  .yr button { width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--bg); font-size: 18px; }
+  .yr button:disabled { opacity: .3; cursor: default; }
+  .mgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .mgrid button { border: 0; background: var(--bg); border-radius: 10px; padding: 12px 0; font-size: 15px; }
+  .mgrid button:hover:not(:disabled) { background: var(--accent-soft); }
+  .mgrid button.on { background: var(--accent); color: #fff; font-weight: 700; }
+  .mgrid button:disabled { opacity: .3; cursor: default; }
+  @media (prefers-color-scheme: dark) { .mgrid button.on { color: #0F1A1D; } }
+  .mgrid small { display: block; font-size: 11px; color: var(--muted); }
+  .mgrid button.on small { color: inherit; opacity: .85; }
   .month .cycle { font-size: 13px; font-weight: 400; color: var(--muted); }
   .top-actions { display: flex; align-items: center; gap: 8px; }
   .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 0; background: none; color: var(--ink); display: grid; place-items: center; }
@@ -252,7 +304,7 @@
   <div class="topbar">
     <div class="month">
       <button id="prevMonth" aria-label="上一期">‹</button>
-      <h2 id="monthLabel"></h2>
+      <button class="month-pick" id="monthLabel" aria-label="選擇帳單期"></button>
       <button id="nextMonth" aria-label="下一期">›</button>
     </div>
     <div class="top-actions">
@@ -276,6 +328,21 @@
       <svg class="donut" id="donut" viewBox="0 0 180 180" role="img" aria-label="各分類支出比例"></svg>
       <div class="bars" id="bars"></div>
     </div>
+  </section>
+
+  <section class="trend hidden" id="trend">
+    <div class="trend-head">
+      <div><h3>消費趨勢</h3><div class="trend-scope" id="trendScope"></div></div>
+      <div class="seg" id="trendSeg">
+        <button data-n="3">3 期</button><button data-n="6" class="on">6 期</button><button data-n="12">12 期</button>
+      </div>
+    </div>
+    <div class="trend-chart" id="trendChart">
+      <svg id="trendSvg" role="img" aria-label="各期支出折線圖"></svg>
+      <div class="tip" id="trendTip"></div>
+    </div>
+    <div class="trend-stats" id="trendStats"></div>
+    <div class="movers" id="movers"></div>
   </section>
 
   <div class="filter-note hidden" id="filterNote">
@@ -338,6 +405,15 @@
       <button class="btn-cancel" id="btnCatCancel">取消</button>
       <button class="btn-primary" id="btnCatSave">儲存</button>
     </div>
+  </div>
+</dialog>
+
+<dialog id="dlgMonth">
+  <div class="dlg">
+    <div class="dlg-head"><h3>選擇帳單期</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+    <div class="yr"><button id="yrPrev" aria-label="上一年">‹</button><b id="yrLabel"></b><button id="yrNext" aria-label="下一年">›</button></div>
+    <div class="mgrid" id="mGrid"></div>
+    <button class="btn-ghost" id="btnThisCycle">回到本期</button>
   </div>
 </dialog>
 
@@ -422,6 +498,10 @@ const REGION_NAME = { domestic: "國內", abroad: "海外" };
 const inRegion = t => !region || (region === "abroad") === isAbroad(t);
 const now = new Date();
 let ym = cycleOf(now.getFullYear(), now.getMonth() + 1, now.getDate());
+const CUR = { ...ym };                         // 目前這一期
+let trendN = 6, cycleCache = {}, trendToken = 0;
+const keyOf = c => `${c.y}-${pad(c.m)}`;
+function backCycles(c, k) { let y = c.y, m = c.m - k; while (m < 1) { m += 12; y--; } return { y, m }; }
 
 function fillCatSelect(current) {
   const prev = $("fCat").value;
@@ -479,7 +559,9 @@ onAuthStateChanged(auth, u => {
 function subscribe() {
   if (unsub) unsub();
   const r = cycleRange(ym);
-  $("monthLabel").innerHTML = `${ym.y} 年 ${ym.m} 月帳單<div class="cycle">${r.label}</div>`;
+  $("monthLabel").innerHTML = `${ym.y} 年 ${ym.m} 月帳單<span class="caret">▼</span><div class="cycle">${r.label}</div>`;
+  $("nextMonth").disabled = ym.y > CUR.y || (ym.y === CUR.y && ym.m >= CUR.m);
+  $("nextMonth").style.opacity = $("nextMonth").disabled ? .3 : "";
   const start = r.start, next = r.end;
   const q = query(collection(db, "users", user.uid, "transactions"),
     where("date", ">=", start), where("date", "<", next), orderBy("date", "desc"));
@@ -554,9 +636,11 @@ function render() {
   if (!shown.length) {
     $("list").innerHTML = `<div class="empty">還沒有任何消費。<br><button class="btn-primary" id="emptyAdd">記一筆</button></div>`;
     $("emptyAdd").onclick = () => openTx();
+    renderTrend();
     return;
   }
   renderList(shown, txs, false);
+  renderTrend();
 }
 
 function renderList(shown, pool, withYear) {
@@ -601,6 +685,7 @@ function setSearchMode(on) {
   $("searchBar").classList.toggle("hidden", !on);
   $("searchSum").classList.toggle("hidden", !on);
   $("receipt").classList.toggle("hidden", on);
+  if (on) $("trend").classList.add("hidden");
   document.querySelector(".month").style.visibility = on ? "hidden" : "";
   $("btnSearch").classList.toggle("hidden", on);
   if (on) {
@@ -667,6 +752,173 @@ function renderDonut(cats, total) {
     filter = filter === el.dataset.cat ? null : el.dataset.cat; render();
   });
 }
+// ===== 消費趨勢 =====
+async function loadCycles(list) {
+  const missing = list.filter(c => !cycleCache[keyOf(c)]);
+  if (!missing.length) return;
+  const start = cycleRange(missing[0]).start, end = cycleRange(missing[missing.length - 1]).end;
+  const snap = await getDocs(query(collection(db, "users", user.uid, "transactions"),
+    where("date", ">=", start), where("date", "<", end)));
+  const fresh = {};
+  missing.forEach(c => fresh[keyOf(c)] = []);
+  snap.docs.forEach(d => {
+    const t = d.data();
+    const k = keyOf(cycleOf(...t.date.split("-").map(Number)));
+    if (fresh[k]) fresh[k].push(t);
+  });
+  Object.assign(cycleCache, fresh);
+}
+
+async function renderTrend() {
+  if (searching || !user) return;
+  const token = ++trendToken;
+  const list = [];
+  for (let i = trendN - 1; i >= 0; i--) list.push(backCycles(ym, i));
+  cycleCache[keyOf(ym)] = txs;                  // 本期用即時資料
+  try { await loadCycles(list); } catch (e) { return; }
+  if (token !== trendToken) return;
+
+  const pick = t => (!t.currency || t.currency === "TWD") && inRegion(t) && (!filter || (t.category || UNCAT) === filter);
+  const sumOf = arr => arr.filter(pick).reduce((s, t) => s + (+t.amount || 0), 0);
+  const pts = list.map(c => ({ c, v: sumOf(cycleCache[keyOf(c)] || []) }));
+  const hasData = pts.some(p => p.v > 0);
+  $("trend").classList.toggle("hidden", !hasData);
+  if (!hasData) return;
+
+  const scope = [region && REGION_NAME[region], filter].filter(Boolean);
+  $("trendScope").textContent = scope.length ? `只看「${scope.join("・")}」，點上方圓餅圖可切換` : "全部支出，點圓餅圖或國內／海外可只看單一項目";
+  $("trendSeg").querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.n === trendN));
+
+  drawTrend(pts);
+
+  // 統計
+  const vals = pts.map(p => p.v);
+  const avgPrev = pts.length > 1 ? vals.slice(0, -1).reduce((a, b) => a + b, 0) / (pts.length - 1) : 0;
+  const avgAll = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const maxP = pts.reduce((a, b) => (b.v > a.v ? b : a));
+  const cur = pts[pts.length - 1].v;
+  const diff = avgPrev ? Math.round((cur - avgPrev) / avgPrev * 100) : 0;
+  const isCurrent = ym.y === CUR.y && ym.m === CUR.m;
+  $("trendStats").innerHTML = `
+    <div>平均每期<b>${fmt(avgAll)}</b></div>
+    <div>最高<b>${fmt(maxP.v)}</b><small>${maxP.c.y}/${maxP.c.m} 月帳單</small></div>
+    <div>這期比前 ${pts.length - 1} 期平均<b>${diff > 0 ? "▲" : diff < 0 ? "▼" : ""} ${Math.abs(diff)}%</b>${isCurrent ? "<small>本期尚未結束</small>" : ""}</div>`;
+
+  // 分類變化最大的（只在沒有選分類時）
+  if (filter || pts.length < 2) { $("movers").innerHTML = ""; return; }
+  const catSum = (arrs) => {
+    const m = {};
+    arrs.forEach(arr => arr.filter(t => (!t.currency || t.currency === "TWD") && inRegion(t))
+      .forEach(t => { const c = t.category || UNCAT; m[c] = (m[c] || 0) + (+t.amount || 0); }));
+    return m;
+  };
+  const curCat = catSum([cycleCache[keyOf(ym)] || []]);
+  const prevArrs = list.slice(0, -1).map(c => cycleCache[keyOf(c)] || []);
+  const prevCat = catSum(prevArrs);
+  const n = prevArrs.length;
+  const moves = Object.keys({ ...curCat, ...prevCat }).map(c => {
+    const a = (prevCat[c] || 0) / n, b = curCat[c] || 0;
+    return { c, d: b - a, pct: a ? Math.round((b - a) / a * 100) : null };
+  }).filter(x => Math.abs(x.d) >= 300).sort((x, y) => Math.abs(y.d) - Math.abs(x.d)).slice(0, 3);
+  $("movers").innerHTML = moves.length
+    ? "跟前幾期平均比，變化最大：" + moves.map(x => `<span><i style="background:${colorOf(x.c)}"></i>${esc(x.c)} ${x.d > 0 ? "多" : "少"} ${fmt(Math.abs(x.d))}${x.pct !== null ? `（${x.pct > 0 ? "+" : ""}${x.pct}%）` : ""}</span>`).join("")
+    : "";
+}
+
+function drawTrend(pts) {
+  const svg = $("trendSvg");
+  const W = svg.clientWidth || 600, H = 200;
+  const L = 46, R = 12, T = 14, B = 26;
+  const max = Math.max(...pts.map(p => p.v)) || 1;
+  const step = niceStep(max / 3);
+  const top = Math.ceil(max / step) * step;
+  const x = i => pts.length === 1 ? (L + W - R) / 2 : L + i * (W - L - R) / (pts.length - 1);
+  const y = v => T + (H - T - B) * (1 - v / top);
+  const avg = pts.reduce((a, p) => a + p.v, 0) / pts.length;
+  const short = v => v >= 10000 ? (v / 10000).toFixed(v % 10000 ? 1 : 0).replace(/\.0$/, "") + "萬" : fmt(v);
+
+  let g = "";
+  for (let v = 0; v <= top + 1; v += step) {
+    g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>
+          <text class="axis-t" x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${short(v)}</text>`;
+  }
+  const every = (W - L - R) / pts.length < 38 ? 2 : 1;
+  pts.forEach((p, i) => {
+    if ((pts.length - 1 - i) % every) return;
+    const yr = i === 0 || p.c.m === 1 ? `${String(p.c.y).slice(2)}/` : "";
+    g += `<text class="axis-t" x="${x(i)}" y="${H - 6}" text-anchor="middle">${yr}${p.c.m}月</text>`;
+  });
+  const path = pts.map((p, i) => `${i ? "L" : "M"}${x(i)},${y(p.v)}`).join("");
+  const area = `${path}L${x(pts.length - 1)},${y(0)}L${x(0)},${y(0)}Z`;
+  g += `<path class="area" d="${area}"/>
+        <line class="avg" x1="${L}" x2="${W - R}" y1="${y(avg)}" y2="${y(avg)}"/>
+        <path class="line" d="${path}"/>
+        <text class="avg-t" x="${L + 6}" y="${y(avg) - 6}">平均 ${fmt(avg)}</text>
+        <line class="guide" id="trendGuide" y1="${T}" y2="${H - B}"/>`;
+  pts.forEach((p, i) => {
+    g += `<circle class="pt ${i === pts.length - 1 ? "cur" : ""}" cx="${x(i)}" cy="${y(p.v)}" r="${i === pts.length - 1 ? 5 : 4}"/>`;
+  });
+  const half = pts.length > 1 ? (W - L - R) / (pts.length - 1) / 2 : 40;
+  pts.forEach((p, i) => {
+    g += `<rect class="hit" data-i="${i}" x="${x(i) - half}" y="0" width="${half * 2}" height="${H}"/>`;
+  });
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = g;
+
+  const tip = $("trendTip"), guide = $("trendGuide");
+  svg.querySelectorAll(".hit").forEach(r => {
+    const i = +r.dataset.i, p = pts[i];
+    const show = () => {
+      tip.innerHTML = `${p.c.y}/${p.c.m} 月帳單<br><b>NT$ ${fmt(p.v)}</b>`;
+      tip.style.left = `${x(i) / W * 100}%`;
+      tip.style.top = `${y(p.v)}px`;
+      tip.style.opacity = 1;
+      guide.setAttribute("x1", x(i)); guide.setAttribute("x2", x(i)); guide.style.opacity = .5;
+    };
+    r.addEventListener("mouseenter", show);
+    r.addEventListener("mouseleave", () => { tip.style.opacity = 0; guide.style.opacity = 0; });
+    r.addEventListener("click", () => {
+      if (i === pts.length - 1) return show();
+      ym = { ...p.c }; filter = filter; subscribe();   // 跳到那一期，保留篩選
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+}
+function niceStep(raw) {
+  const pow = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+  const n = raw / pow;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
+}
+$("trendSeg").querySelectorAll("button").forEach(b => b.onclick = () => { trendN = +b.dataset.n; renderTrend(); });
+let resizeTimer;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderTrend, 200); });
+
+// ===== 選擇年月 =====
+let pickYear;
+function drawMonthGrid() {
+  $("yrLabel").textContent = `${pickYear} 年`;
+  $("yrNext").disabled = pickYear >= CUR.y;
+  $("yrPrev").disabled = pickYear <= 2010;
+  let h = "";
+  for (let m = 1; m <= 12; m++) {
+    const future = pickYear > CUR.y || (pickYear === CUR.y && m > CUR.m);
+    const on = pickYear === ym.y && m === ym.m;
+    const r = cycleRange({ y: pickYear, m });
+    h += `<button data-m="${m}" class="${on ? "on" : ""}" ${future ? "disabled" : ""}>${m} 月<small>${r.label.split(" – ")[0]}起</small></button>`;
+  }
+  $("mGrid").innerHTML = h;
+  $("mGrid").querySelectorAll("button").forEach(b => b.onclick = () => {
+    ym = { y: pickYear, m: +b.dataset.m };
+    filter = null; region = null;
+    $("dlgMonth").close();
+    subscribe();
+  });
+}
+$("monthLabel").onclick = () => { pickYear = ym.y; drawMonthGrid(); $("dlgMonth").showModal(); };
+$("yrPrev").onclick = () => { pickYear--; drawMonthGrid(); };
+$("yrNext").onclick = () => { pickYear++; drawMonthGrid(); };
+$("btnThisCycle").onclick = () => { ym = { ...CUR }; filter = null; region = null; $("dlgMonth").close(); subscribe(); };
+
 $("clearFilter").onclick = () => { filter = null; region = null; render(); };
 
 // ===== 新增 / 編輯 =====
@@ -761,6 +1013,7 @@ $("txForm").onsubmit = async e => {
       }
     }
     toast(msg);
+    cycleCache = {};
     $("dlgTx").close();
     if (searching) { await loadAll(); renderSearch(); return; }
     const c = cycleOf(...data.date.split("-").map(Number));
@@ -777,6 +1030,7 @@ $("btnDelete").onclick = async () => {
   await deleteDoc(doc(db, "users", user.uid, "transactions", editingId));
   $("dlgTx").close();
   toast("已刪除");
+  cycleCache = {};
   if (searching) { allTxs = allTxs.filter(t => t.id !== editingId); renderSearch(); }
 };
 
@@ -872,6 +1126,7 @@ $("btnCatSave").onclick = async () => {
     if (filter && !names.includes(filter)) filter = null;
     $("dlgCats").close();
     toast("分類已儲存");
+    cycleCache = {};
   } catch (err) {
     toast("儲存失敗：" + err.code);
   } finally {
