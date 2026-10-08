@@ -150,6 +150,12 @@
     background: var(--paper); font-size: 16px;
   }
   .searchbar input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .tip-card {
+    display: flex; gap: 12px; align-items: flex-start; background: var(--accent-soft); color: var(--ink);
+    border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-size: 14px; line-height: 1.6;
+  }
+  .tip-card ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+  .tip-card .tip-x { margin-left: auto; flex: none; background: none; border: 0; color: var(--accent); font-size: 13px; font-weight: 700; padding: 2px 4px; }
   /* 消費分析 */
   .an-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
   .an-head h2 { margin: 0; font-size: 19px; }
@@ -379,6 +385,19 @@
     </div>
   </div>
 
+  <div class="tip-card hidden" id="tipCard">
+    <div>
+      點右上角的<b>頭像</b>，可以使用更多功能：
+      <ul>
+        <li>消費分析：選一段期間，看每家店總共花了多少，由高到低排行</li>
+        <li>管理分類：新增、改名、刪除分類，和店家自動分類規則</li>
+        <li>匯出本期 CSV：用 Excel 打開</li>
+        <li>刷卡自動匯入：開通後，刷卡通知信會自動記進來</li>
+      </ul>
+    </div>
+    <button class="tip-x" id="tipClose">知道了</button>
+  </div>
+
   <div class="searchbar hidden" id="searchBar">
     <input id="searchInput" type="search" placeholder="搜尋商店、備註或分類，例如：UNIQLO" autocomplete="off">
     <button class="btn-cancel" id="btnSearchClose">取消</button>
@@ -482,7 +501,7 @@
     <div class="menu-list">
       <button class="btn-ghost" id="btnAnalysis">消費分析（店家排行）</button>
       <button class="btn-ghost" id="btnCats">管理分類</button>
-      <button class="btn-ghost" id="btnKey">複製自動匯入金鑰</button>
+      <button class="btn-ghost" id="btnKey">刷卡自動匯入</button>
       <button class="btn-ghost" id="btnExport">匯出本期 CSV（Excel 可開）</button>
       <button class="btn-cancel" id="btnLogout">登出</button>
 
@@ -519,16 +538,28 @@
 
 <dialog id="dlgKey">
   <div class="dlg">
-    <div class="dlg-head"><h3>自動匯入金鑰</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
-    <div class="info">
-      把這串金鑰貼到 Apps Script 的 IMPORT_KEY，刷卡通知信就會自動匯入你的記帳本。
-      金鑰等同你的記帳密碼：拿到的人可以讀寫你的記帳資料，請不要傳給別人或貼到公開的地方。
+    <div class="dlg-head"><h3>刷卡自動匯入</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+    <div id="svcOn">
+      <p class="cat-hint" style="font-size:14px;color:var(--ink)">開通後，你 Gmail 裡的刷卡通知信會每小時自動匯入記帳本，不用寫程式。目前支援國泰世華。</p>
+      <ol class="cat-hint" style="padding-left:20px;margin:10px 0 0">
+        <li>按下方按鈕，會開啟開通頁面</li>
+        <li>用<b>收刷卡通知信的 Gmail</b> 登入，畫面出現「Google 尚未驗證這個應用程式」時，點「進階」→「前往」→「允許」</li>
+        <li>選擇要匯入多久以前的紀錄，按「開通自動匯入」</li>
+      </ol>
     </div>
-    <div class="field"><label for="keyText">金鑰</label><input id="keyText" readonly></div>
     <div class="dlg-actions">
       <button class="btn-cancel" id="btnKeyClose">關閉</button>
-      <button class="btn-primary" id="btnKeyCopy">複製金鑰</button>
+      <button class="btn-primary" id="btnSvc">前往開通</button>
     </div>
+    <details>
+      <summary class="cat-hint" style="cursor:pointer">進階：手動複製金鑰</summary>
+      <div class="info" style="margin-top:8px">
+        自己設定 Apps Script，或開通頁面要求貼上金鑰時使用。
+        金鑰等同你的記帳密碼，拿到的人可以讀寫你的記帳資料，請不要傳給別人。
+      </div>
+      <div class="field" style="margin-top:8px"><label for="keyText">金鑰</label><input id="keyText" readonly></div>
+      <button class="btn-ghost" id="btnKeyCopy" style="margin-top:8px;width:100%">複製金鑰</button>
+    </details>
   </div>
 </dialog>
 
@@ -553,6 +584,9 @@ const firebaseConfig = {
   messagingSenderId: "208507111007",
   appId: "1:208507111007:web:50e2c757cc44619e39fdea",
 };
+
+// 刷卡自動匯入服務的網址（Apps Script 部署成網頁應用程式後，把網址貼在這裡）
+const IMPORT_SERVICE_URL = "";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -652,7 +686,24 @@ $("btnLogin").onclick = async () => {
   }
 };
 
+// 換帳號或登出時，把上一個帳號留在畫面和記憶體裡的資料全部清掉
+function resetSession() {
+  [unsub, unsubCats, unsubRules].forEach(f => f && f());
+  unsub = unsubCats = unsubRules = null;
+  txs = []; allTxs = null; cycleCache = {}; clearAn();
+  storeRules = {}; CATEGORIES = DEFAULT_CATEGORIES;
+  filter = null; region = null; onlyPending = false; editingId = null;
+  anStart = null; anData = null;
+  ym = { ...CUR };
+  if (searching) { searching = false; $("searchBar").classList.add("hidden"); $("searchSum").classList.add("hidden"); $("receipt").classList.remove("hidden"); }
+  $("analysis").classList.add("hidden");
+  document.querySelectorAll("dialog[open]").forEach(d => d.close());
+  $("list").innerHTML = ""; $("total").textContent = "…"; $("trend").classList.add("hidden");
+  $("billRow").innerHTML = ""; $("split").innerHTML = "";
+}
+
 onAuthStateChanged(auth, u => {
+  resetSession();
   user = u;
   $("login").classList.toggle("hidden", !!u);
   $("app").classList.toggle("hidden", !u);
@@ -672,10 +723,6 @@ onAuthStateChanged(auth, u => {
       if ($("dlgCats").open) renderRules();
     });
     subscribe();
-  } else {
-    if (unsub) { unsub(); unsub = null; }
-    if (unsubCats) { unsubCats(); unsubCats = null; }
-    if (unsubRules) { unsubRules(); unsubRules = null; }
   }
 });
 
@@ -829,7 +876,9 @@ const norm = s => String(s || "")
   .replace(/\s+/g, "").toLowerCase();
 
 async function loadAll() {
-  const snap = await getDocs(collection(db, "users", user.uid, "transactions"));
+  const uid = user.uid;
+  const snap = await getDocs(collection(db, "users", uid, "transactions"));
+  if (user?.uid !== uid) return;
   allTxs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
 }
@@ -842,6 +891,7 @@ function setSearchMode(on, initial = "") {
   if (on) $("trend").classList.add("hidden");
   document.querySelector(".month").style.visibility = on ? "hidden" : "";
   $("btnSearch").classList.toggle("hidden", on);
+  $("tipCard").style.display = on ? "none" : "";
   if (on) {
     $("filterNote").classList.add("hidden");
     $("searchInput").value = searchQ = initial;
@@ -925,7 +975,9 @@ async function loadAnalysis() {
     $("anSum").innerHTML = `<div class="an-meta">計算中…</div>`;
     $("anList").innerHTML = "";
     try {
-      const snap = await getDocs(query(collection(db, "users", user.uid, "transactions"), where("date", ">=", start)));
+      const uid = user.uid;
+      const snap = await getDocs(query(collection(db, "users", uid, "transactions"), where("date", ">=", start)));
+      if (user?.uid !== uid) return;
       anCache[start] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (err) { $("anSum").innerHTML = `<div class="an-meta">讀取失敗：${esc(err.code)}</div>`; return; }
   }
@@ -978,6 +1030,14 @@ function renderAnList(total) {
   });
 }
 $("btnAnalysis").onclick = openAnalysis;
+
+// 首頁的功能提示：按「知道了」之後就不再顯示（存在這個瀏覽器）
+try { $("tipCard").classList.toggle("hidden", localStorage.getItem("tipSeen") === "1"); }
+catch (e) { $("tipCard").classList.remove("hidden"); }
+$("tipClose").onclick = () => {
+  $("tipCard").classList.add("hidden");
+  try { localStorage.setItem("tipSeen", "1"); } catch (e) {}
+};
 $("btnAnBack").onclick = closeAnalysis;
 $("anMore").onclick = () => { anShowAll = true; renderAnList(anData.reduce((s, g) => s + g.total, 0)); };
 $("anPresets").querySelectorAll("button").forEach(b => b.onclick = () => applyPreset(b.dataset.p));
@@ -1020,6 +1080,7 @@ function renderDonut(cats, total) {
 }
 // ===== 消費趨勢 =====
 async function loadCycles(list) {
+  const uid = user?.uid;
   const missing = list.filter(c => !cycleCache[keyOf(c)]);
   if (!missing.length) return;
   const start = cycleRange(missing[0]).start, end = cycleRange(missing[missing.length - 1]).end;
@@ -1032,6 +1093,7 @@ async function loadCycles(list) {
     const k = keyOf(cycleOf(...t.date.split("-").map(Number)));
     if (fresh[k]) fresh[k].push(t);
   });
+  if (user?.uid !== uid) return;              // 期間換了帳號，丟掉
   Object.assign(cycleCache, fresh);
 }
 
@@ -1458,7 +1520,15 @@ $("btnLogout").onclick = () => { $("dlgMenu").close(); signOut(auth); };
 $("btnKey").onclick = () => {
   $("dlgMenu").close();
   $("keyText").value = user.refreshToken;
+  $("btnSvc").classList.toggle("hidden", !IMPORT_SERVICE_URL);
+  $("svcOn").classList.toggle("hidden", !IMPORT_SERVICE_URL);
   $("dlgKey").showModal();
+};
+$("btnSvc").onclick = async () => {
+  // 金鑰放在網址 # 後面帶過去（不會送到伺服器），同時複製一份到剪貼簿備用
+  try { await navigator.clipboard.writeText(user.refreshToken); } catch (e) {}
+  window.open(IMPORT_SERVICE_URL + "#k=" + encodeURIComponent(user.refreshToken), "_blank");
+  $("dlgKey").close();
 };
 $("btnKeyClose").onclick = () => $("dlgKey").close();
 $("btnKeyCopy").onclick = async () => {
