@@ -19,6 +19,8 @@
     --accent: #146C6B;
     --accent-soft: #DCEDEA;
     --danger: #B3261E;
+    --danger-soft: #FBEAE8;
+    --danger-soft-hover: #F6D5D1;
     --num: "Barlow Condensed", "Noto Sans TC", system-ui, sans-serif;
     --text: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
     box-sizing: border-box;
@@ -29,6 +31,7 @@
     :root {
       --bg: #141B1F; --paper: #1E282E; --ink: #E6ECEA; --muted: #93A1A8;
       --line: #2E3B42; --accent: #5BC0B4; --accent-soft: #1F3B3A; --danger: #F2827A;
+      --danger-soft: #3A2422; --danger-soft-hover: #4A2C29;
     }
   }
   *, *::before, *::after { box-sizing: inherit; }
@@ -48,13 +51,29 @@
   #login { min-height: 100vh; display: grid; place-items: center; padding: 24px; text-align: center; }
   #login h1 { font-size: 28px; margin: 0 0 8px; }
   #login p { color: var(--muted); margin: 0 0 28px; }
-  .btn-primary {
-    background: var(--accent); color: #fff; border: 0; border-radius: 10px;
-    padding: 12px 22px; font-weight: 500;
+  .btn-primary, .btn-ghost, .btn-cancel, .btn-danger {
+    min-height: 44px; padding: 0 20px; border-radius: 12px; border: 0;
+    font-weight: 500; transition: background-color .15s, filter .15s, transform .1s;
   }
+  .btn-primary:active, .btn-ghost:active, .btn-cancel:active, .btn-danger:active, .x-btn:active, .fab:active { transform: scale(.97); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-primary:disabled { opacity: .55; cursor: wait; }
   @media (prefers-color-scheme: dark) { .btn-primary { color: #0F1A1D; } }
-  .btn-ghost { background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px; }
-  .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: 10px; padding: 10px 16px; }
+  .btn-ghost { background: var(--bg); color: var(--ink); }
+  .btn-ghost:hover { background: var(--accent-soft); }
+  .btn-cancel { background: var(--danger-soft); color: var(--danger); }
+  .btn-cancel:hover { background: var(--danger-soft-hover); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { filter: brightness(1.08); }
+  @media (prefers-color-scheme: dark) { .btn-danger { color: #1E1414; } }
+  .x-btn {
+    width: 34px; height: 34px; flex: none; border-radius: 50%; border: 0;
+    display: grid; place-items: center; background: var(--danger-soft); color: var(--danger);
+    transition: background-color .15s;
+  }
+  .x-btn:hover { background: var(--danger-soft-hover); }
+  .x-btn svg { width: 14px; height: 14px; }
 
   /* 頂部月份切換 */
   .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
@@ -137,12 +156,29 @@
 
   /* 對話框 */
   dialog {
-    border: 0; border-radius: 16px; padding: 0; width: min(440px, calc(100% - 24px));
+    border: 0; border-radius: 20px; padding: 0; width: min(440px, calc(100% - 24px));
+    max-height: 90vh; overflow-y: auto;
     background: var(--paper); color: var(--ink);
+    box-shadow: 0 20px 50px rgba(10, 20, 25, .25);
   }
-  dialog::backdrop { background: rgba(10, 20, 25, .45); }
-  .dlg { padding: 22px; display: grid; gap: 14px; }
-  .dlg h3 { margin: 0; font-size: 18px; }
+  dialog[open] { animation: pop .18s ease-out; }
+  @keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+  dialog::backdrop { background: rgba(10, 20, 25, .45); backdrop-filter: blur(2px); }
+  .dlg { padding: 22px; display: grid; gap: 16px; }
+  .dlg-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .dlg h3 { margin: 0; font-size: 19px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .field input:focus, .field select:focus, .cat-row input[type=text]:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  /* 手機：對話框從底部滑出 */
+  @media (max-width: 520px) {
+    dialog { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 22px 22px 0 0; max-height: 92vh; }
+    dialog[open] { animation: sheet .24s ease-out; }
+    @keyframes sheet { from { transform: translateY(100%); } }
+    .dlg { padding: 22px 20px calc(22px + env(safe-area-inset-bottom, 0px)); }
+    .dlg-actions button { flex: 1; }
+    .dlg-actions .btn-danger { flex-basis: 100%; order: 3; }
+  }
   .field { display: grid; gap: 4px; }
   .field label { font-size: 13px; color: var(--muted); }
   .field input, .field select {
@@ -150,7 +186,7 @@
     background: var(--bg); width: 100%; min-width: 0;
   }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .dlg-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 4px; }
+  .dlg-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 6px; }
   .dlg-actions .btn-danger { margin-right: auto; }
   .info { font-size: 13px; color: var(--muted); background: var(--bg); border-radius: 10px; padding: 10px 12px; }
   .uid { font-family: var(--num); font-size: 15px; word-break: break-all; color: var(--ink); }
@@ -165,6 +201,7 @@
   .link-btn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 13px; font-weight: 500; }
   .field small { font-size: 12px; color: var(--muted); }
   .menu-list button { text-align: left; }
+  .menu-list .btn-cancel { margin-top: 6px; }
 
   .toast {
     position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
@@ -172,7 +209,11 @@
     opacity: 0; transition: opacity .2s; pointer-events: none;
   }
   .toast.show { opacity: 1; }
-  @media (prefers-reduced-motion: reduce) { .toast, .donut circle.seg { transition: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .toast, .donut circle.seg, .btn-primary, .btn-ghost, .btn-cancel, .btn-danger, .x-btn { transition: none; }
+    dialog[open] { animation: none; }
+    .btn-primary:active, .btn-ghost:active, .btn-cancel:active, .btn-danger:active, .x-btn:active, .fab:active { transform: none; }
+  }
 </style>
 </head>
 <body>
@@ -218,7 +259,7 @@
 
 <dialog id="dlgTx">
   <form class="dlg" method="dialog" id="txForm">
-    <h3 id="txTitle">記一筆</h3>
+    <div class="dlg-head"><h3 id="txTitle">記一筆</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <div class="row2">
       <div class="field"><label for="fDate">日期</label><input type="date" id="fDate" required></div>
       <div class="field"><label for="fAmount">金額</label><input type="number" id="fAmount" inputmode="decimal" step="any" min="0" required></div>
@@ -233,7 +274,7 @@
     <div class="info hidden" id="fInfo"></div>
     <div class="dlg-actions">
       <button type="button" class="btn-danger hidden" id="btnDelete">刪除</button>
-      <button type="button" class="btn-ghost" id="btnCancel">取消</button>
+      <button type="button" class="btn-cancel" id="btnCancel">取消</button>
       <button type="submit" class="btn-primary" id="btnSave">儲存</button>
     </div>
   </form>
@@ -241,25 +282,24 @@
 
 <dialog id="dlgMenu">
   <div class="dlg">
-    <h3 id="menuName"></h3>
+    <div class="dlg-head"><h3 id="menuName"></h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <div class="menu-list">
       <button class="btn-ghost" id="btnCats">管理分類</button>
       <button class="btn-ghost" id="btnKey">複製自動匯入金鑰</button>
       <button class="btn-ghost" id="btnExport">匯出本期 CSV（Excel 可開）</button>
-      <button class="btn-ghost" id="btnLogout">登出</button>
-      <button class="btn-ghost" id="btnCloseMenu">關閉</button>
+      <button class="btn-cancel" id="btnLogout">登出</button>
     </div>
   </div>
 </dialog>
 
 <dialog id="dlgCats">
   <div class="dlg">
-    <h3>管理分類</h3>
+    <div class="dlg-head"><h3>管理分類</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <p class="cat-hint">點色塊換顏色。改名會一併更新所有用到這個分類的紀錄；刪除後，那些紀錄會變成「未分類」。</p>
     <div class="cat-list" id="catList"></div>
     <button class="btn-ghost" id="btnCatAdd">＋ 新增分類</button>
     <div class="dlg-actions">
-      <button class="btn-ghost" id="btnCatCancel">取消</button>
+      <button class="btn-cancel" id="btnCatCancel">取消</button>
       <button class="btn-primary" id="btnCatSave">儲存</button>
     </div>
   </div>
@@ -267,14 +307,14 @@
 
 <dialog id="dlgKey">
   <div class="dlg">
-    <h3>自動匯入金鑰</h3>
+    <div class="dlg-head"><h3>自動匯入金鑰</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <div class="info">
       把這串金鑰貼到 Apps Script 的 IMPORT_KEY，刷卡通知信就會自動匯入你的記帳本。
       金鑰等同你的記帳密碼：拿到的人可以讀寫你的記帳資料，請不要傳給別人或貼到公開的地方。
     </div>
     <div class="field"><label for="keyText">金鑰</label><input id="keyText" readonly></div>
     <div class="dlg-actions">
-      <button class="btn-ghost" id="btnKeyClose">關閉</button>
+      <button class="btn-cancel" id="btnKeyClose">關閉</button>
       <button class="btn-primary" id="btnKeyCopy">複製金鑰</button>
     </div>
   </div>
@@ -585,7 +625,9 @@ $("btnDelete").onclick = async () => {
 
 // ===== 選單 =====
 $("btnMenu").onclick = () => $("dlgMenu").showModal();
-$("btnCloseMenu").onclick = () => $("dlgMenu").close();
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => b.closest("dialog").close());
+// 點對話框外的灰色區域也能關閉
+document.querySelectorAll("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
 // ===== 管理分類 =====
 function catRow(name = "", color, orig = "") {
   const row = document.createElement("div");
