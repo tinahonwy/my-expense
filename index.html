@@ -61,7 +61,8 @@
   .month { display: flex; align-items: center; gap: 4px; }
   .month button { background: none; border: 0; font-size: 22px; width: 40px; height: 40px; border-radius: 50%; }
   .month button:hover { background: var(--paper); }
-  .month h2 { margin: 0; font-size: 18px; font-weight: 700; min-width: 120px; text-align: center; }
+  .month h2 { margin: 0; font-size: 17px; font-weight: 700; min-width: 150px; text-align: center; line-height: 1.3; }
+  .month .cycle { font-size: 13px; font-weight: 400; color: var(--muted); }
   .avatar { width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 0; overflow: hidden; background: var(--line); }
   .avatar img { width: 100%; height: 100%; object-fit: cover; }
 
@@ -163,15 +164,15 @@
 <main id="app" class="wrap hidden">
   <div class="topbar">
     <div class="month">
-      <button id="prevMonth" aria-label="上個月">‹</button>
+      <button id="prevMonth" aria-label="上一期">‹</button>
       <h2 id="monthLabel"></h2>
-      <button id="nextMonth" aria-label="下個月">›</button>
+      <button id="nextMonth" aria-label="下一期">›</button>
     </div>
     <button class="avatar" id="btnMenu" aria-label="選單"><img id="avatarImg" alt=""></button>
   </div>
 
   <section class="receipt">
-    <div class="receipt-label">本月支出</div>
+    <div class="receipt-label">本期支出</div>
     <div class="total"><small>NT$</small><span id="total">0</span></div>
     <div class="meta" id="meta"></div>
     <div class="bars" id="bars"></div>
@@ -214,7 +215,7 @@
     </div>
     <div class="menu-list">
       <button class="btn-ghost" id="btnCopyUid">複製使用者 ID</button>
-      <button class="btn-ghost" id="btnExport">匯出本月 CSV（Excel 可開）</button>
+      <button class="btn-ghost" id="btnExport">匯出本期 CSV（Excel 可開）</button>
       <button class="btn-ghost" id="btnLogout">登出</button>
       <button class="btn-ghost" id="btnCloseMenu">關閉</button>
     </div>
@@ -259,9 +260,26 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const pad = n => String(n).padStart(2, "0");
 const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
 
+// 帳單週期：每期從這一天開始，到下個月的前一天結束（24 → 每月 24 日到次月 23 日）
+const CYCLE_DAY = 24;
+
+// 依日期找出所屬的帳單期（以「結束日所在的月份」代表這一期）
+function cycleOf(y, m, d) {
+  if (d >= CYCLE_DAY) { m++; if (m > 12) { m = 1; y++; } }
+  return { y, m };
+}
+function cycleRange({ y, m }) {
+  const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1;
+  return {
+    start: `${py}-${pad(pm)}-${pad(CYCLE_DAY)}`,
+    end: `${y}-${pad(m)}-${pad(CYCLE_DAY)}`,           // 不含這一天
+    label: `${pm}/${CYCLE_DAY} – ${m}/${CYCLE_DAY - 1}`,
+  };
+}
+
 let user = null, unsub = null, txs = [], filter = null, editingId = null;
 const now = new Date();
-let ym = { y: now.getFullYear(), m: now.getMonth() + 1 };
+let ym = cycleOf(now.getFullYear(), now.getMonth() + 1, now.getDate());
 
 $("fCat").innerHTML = `<option value="">${UNCAT}</option>` +
   CATEGORIES.map(([c]) => `<option>${c}</option>`).join("");
@@ -297,9 +315,9 @@ onAuthStateChanged(auth, u => {
 // ===== 讀取當月資料（即時同步） =====
 function subscribe() {
   if (unsub) unsub();
-  $("monthLabel").textContent = `${ym.y} 年 ${ym.m} 月`;
-  const start = `${ym.y}-${pad(ym.m)}-01`;
-  const next = ym.m === 12 ? `${ym.y + 1}-01-01` : `${ym.y}-${pad(ym.m + 1)}-01`;
+  const r = cycleRange(ym);
+  $("monthLabel").innerHTML = `${ym.y} 年 ${ym.m} 月帳單<div class="cycle">${r.label}</div>`;
+  const start = r.start, next = r.end;
   const q = query(collection(db, "users", user.uid, "transactions"),
     where("date", ">=", start), where("date", "<", next), orderBy("date", "desc"));
   $("list").innerHTML = `<div class="empty">載入中…</div>`;
@@ -330,7 +348,7 @@ function render() {
   $("total").textContent = fmt(total);
   $("meta").textContent = txs.length
     ? `共 ${txs.length} 筆` + (foreign ? `，另有 ${foreign} 筆外幣未計入` : "")
-    : "這個月還沒有紀錄";
+    : "這一期還沒有紀錄";
 
   const byCat = {};
   twd.forEach(t => { const c = t.category || UNCAT; byCat[c] = (byCat[c] || 0) + (+t.amount || 0); });
@@ -425,8 +443,8 @@ $("txForm").onsubmit = async e => {
       toast("已新增");
     }
     $("dlgTx").close();
-    const [y, m] = data.date.split("-").map(Number);
-    if (y !== ym.y || m !== ym.m) { ym = { y, m }; subscribe(); }
+    const c = cycleOf(...data.date.split("-").map(Number));
+    if (c.y !== ym.y || c.m !== ym.m) { ym = c; subscribe(); }
   } catch (err) {
     toast("儲存失敗：" + err.code);
   } finally {
@@ -456,7 +474,7 @@ $("btnExport").onclick = () => {
   const csv = [head, ...rows].map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
-  a.download = `記帳_${ym.y}-${pad(ym.m)}.csv`;
+  a.download = `記帳_${ym.y}-${pad(ym.m)}帳單.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
 };
