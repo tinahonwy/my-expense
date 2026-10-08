@@ -385,7 +385,7 @@
     </div>
   </div>
 
-  <div class="tip-card hidden" id="tipCard">
+  <div class="tip-card" id="tipCard">
     <div>
       點右上角的<b>頭像</b>，可以使用更多功能：
       <ul>
@@ -395,7 +395,6 @@
         <li>刷卡自動匯入：開通後，刷卡通知信會自動記進來</li>
       </ul>
     </div>
-    <button class="tip-x" id="tipClose">知道了</button>
   </div>
 
   <div class="searchbar hidden" id="searchBar">
@@ -1031,13 +1030,7 @@ function renderAnList(total) {
 }
 $("btnAnalysis").onclick = openAnalysis;
 
-// 首頁的功能提示：按「知道了」之後就不再顯示（存在這個瀏覽器）
-try { $("tipCard").classList.toggle("hidden", localStorage.getItem("tipSeen") === "1"); }
-catch (e) { $("tipCard").classList.remove("hidden"); }
-$("tipClose").onclick = () => {
-  $("tipCard").classList.add("hidden");
-  try { localStorage.setItem("tipSeen", "1"); } catch (e) {}
-};
+
 $("btnAnBack").onclick = closeAnalysis;
 $("anMore").onclick = () => { anShowAll = true; renderAnList(anData.reduce((s, g) => s + g.total, 0)); };
 $("anPresets").querySelectorAll("button").forEach(b => b.onclick = () => applyPreset(b.dataset.p));
