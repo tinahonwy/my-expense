@@ -390,6 +390,7 @@
       點右上角的<b>頭像</b>，可以使用更多功能：
       <ul>
         <li>消費分析：選一段期間，看每家店總共花了多少，由高到低排行</li>
+        <li>帳單結帳日：設定你信用卡每期從哪天算到哪天</li>
         <li>管理分類：新增、改名、刪除分類，和店家自動分類規則</li>
         <li>匯出本期 CSV：用 Excel 打開</li>
         <li>刷卡自動匯入：開通後，刷卡通知信會自動記進來</li>
@@ -499,6 +500,7 @@
     <div class="dlg-head"><h3 id="menuName"></h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <div class="menu-list">
       <button class="btn-ghost" id="btnAnalysis">消費分析（店家排行）</button>
+      <button class="btn-ghost" id="btnCycle">帳單結帳日</button>
       <button class="btn-ghost" id="btnCats">管理分類</button>
       <button class="btn-ghost" id="btnKey">刷卡自動匯入</button>
       <button class="btn-ghost" id="btnExport">匯出本期 CSV（Excel 可開）</button>
@@ -535,11 +537,27 @@
   </div>
 </dialog>
 
+<dialog id="dlgCycle">
+  <div class="dlg">
+    <div class="dlg-head"><h3>帳單結帳日</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+    <p class="cat-hint" style="font-size:14px;color:var(--ink)">選你信用卡帳單上寫的「結帳日」，網頁就會照你的帳單分期。可以在銀行 App 或帳單上的「本期結帳日」找到。</p>
+    <div class="field">
+      <label for="cycleSel">每月結帳日</label>
+      <select id="cycleSel"></select>
+    </div>
+    <div class="info" id="cycleHint"></div>
+    <div class="dlg-actions">
+      <button class="btn-cancel" id="btnCycleCancel">取消</button>
+      <button class="btn-primary" id="btnCycleSave">儲存</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="dlgKey">
   <div class="dlg">
     <div class="dlg-head"><h3>刷卡自動匯入</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <div id="svcOn">
-      <p class="cat-hint" style="font-size:14px;color:var(--ink)">開通後，你 Gmail 裡的刷卡通知信會每小時自動匯入記帳本，不用寫程式。目前支援國泰世華。</p>
+      <p class="cat-hint" style="font-size:14px;color:var(--ink)">開通後，你 Gmail 裡的刷卡通知信會每 15 分鐘自動匯入記帳本，不用寫程式。目前支援國泰世華。</p>
       <ol class="cat-hint" style="padding-left:20px;margin:10px 0 0">
         <li>按下方按鈕，會開啟開通頁面</li>
         <li>用<b>收刷卡通知信的 Gmail</b> 登入，畫面出現「Google 尚未驗證這個應用程式」時，點「進階」→「前往」→「允許」</li>
@@ -570,7 +588,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, query, where, orderBy, onSnapshot,
-         addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDocs, writeBatch,
+         addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDoc, getDocs, writeBatch,
          initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
          clearIndexedDbPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -627,15 +645,21 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const pad = n => String(n).padStart(2, "0");
 const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
 
-// 帳單週期：每期從這一天開始，到下個月的前一天結束（24 → 每月 24 日到次月 23 日）
-const CYCLE_DAY = 24;
+// 帳單週期：每期從 CYCLE_DAY 這天開始，到下個月的前一天結束
+// 每個人在「帳單結帳日」自己設定（存在雲端）；1 代表自然月（每月 1 日到月底）
+let CYCLE_DAY = 1;
 
 // 依日期找出所屬的帳單期（以「結束日所在的月份」代表這一期）
 function cycleOf(y, m, d) {
-  if (d >= CYCLE_DAY) { m++; if (m > 12) { m = 1; y++; } }
+  if (CYCLE_DAY > 1 && d >= CYCLE_DAY) { m++; if (m > 12) { m = 1; y++; } }
   return { y, m };
 }
 function cycleRange({ y, m }) {
+  if (CYCLE_DAY === 1) {
+    const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+    const last = new Date(y, m, 0).getDate();
+    return { start: `${y}-${pad(m)}-01`, end: `${ny}-${pad(nm)}-01`, label: `${m}/1 – ${m}/${last}` };
+  }
   const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1;
   return {
     start: `${py}-${pad(pm)}-${pad(CYCLE_DAY)}`,
@@ -655,7 +679,12 @@ const REGION_NAME = { domestic: "國內", abroad: "海外" };
 const inRegion = t => !region || (region === "abroad") === isAbroad(t);
 const now = new Date();
 let ym = cycleOf(now.getFullYear(), now.getMonth() + 1, now.getDate());
-const CUR = { ...ym };                         // 目前這一期
+let CUR = { ...ym };                           // 目前這一期
+function setCycleDay(day) {
+  CYCLE_DAY = Math.min(Math.max(+day || 1, 1), 28);
+  CUR = cycleOf(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  ym = { ...CUR };
+}
 let trendN = 6, cycleCache = {}, trendToken = 0;
 const keyOf = c => `${c.y}-${pad(c.m)}`;
 function backCycles(c, k) { let y = c.y, m = c.m - k; while (m < 1) { m += 12; y--; } return { y, m }; }
@@ -701,7 +730,7 @@ function resetSession() {
   $("billRow").innerHTML = ""; $("split").innerHTML = "";
 }
 
-onAuthStateChanged(auth, u => {
+onAuthStateChanged(auth, async u => {
   resetSession();
   user = u;
   $("login").classList.toggle("hidden", !!u);
@@ -721,6 +750,12 @@ onAuthStateChanged(auth, u => {
       ((snap.exists() && snap.data().list) || []).forEach(r => { if (r.store) storeRules[r.store] = r.category; });
       if ($("dlgCats").open) renderRules();
     });
+    // 讀這個人的帳單結帳日，再開始載入資料
+    try {
+      const pref = await getDoc(doc(db, "users", u.uid, "settings", "prefs"));
+      if (user?.uid !== u.uid) return;
+      setCycleDay(pref.exists() ? pref.data().cycleDay : 1);
+    } catch (e) { setCycleDay(1); }
     subscribe();
   }
 });
@@ -1029,6 +1064,42 @@ function renderAnList(total) {
   });
 }
 $("btnAnalysis").onclick = openAnalysis;
+
+// ===== 帳單結帳日 =====
+// 選單的值 = 結帳日；存的 cycleDay = 結帳日的隔天（月底結帳 → 1，也就是自然月）
+$("cycleSel").innerHTML = Array.from({ length: 27 }, (_, i) => `<option value="${i + 2}">每月 ${i + 1} 日</option>`).join("")
+  + `<option value="1">月底（每月 1 日到月底）</option>`;
+function cycleHintText() {
+  const d = +$("cycleSel").value;
+  $("cycleHint").textContent = d === 1
+    ? "例如 10 月帳單＝10/1 到 10/31 的消費"
+    : `例如 10 月帳單＝9/${d} 到 10/${d - 1} 的消費`;
+}
+$("cycleSel").onchange = cycleHintText;
+$("btnCycle").onclick = () => {
+  $("dlgMenu").close();
+  $("cycleSel").value = String(CYCLE_DAY);
+  cycleHintText();
+  $("dlgCycle").showModal();
+};
+$("btnCycleCancel").onclick = () => $("dlgCycle").close();
+$("btnCycleSave").onclick = async () => {
+  const day = +$("cycleSel").value;
+  $("btnCycleSave").disabled = true;
+  try {
+    await setDoc(doc(db, "users", user.uid, "settings", "prefs"), { cycleDay: day, updatedAt: serverTimestamp() }, { merge: true });
+    setCycleDay(day);
+    cycleCache = {}; clearAn();
+    filter = null; region = null;
+    $("dlgCycle").close();
+    subscribe();
+    toast("結帳日已儲存");
+  } catch (err) {
+    toast("儲存失敗：" + err.code);
+  } finally {
+    $("btnCycleSave").disabled = false;
+  }
+};
 
 
 $("btnAnBack").onclick = closeAnalysis;
