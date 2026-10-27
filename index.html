@@ -26,6 +26,10 @@
     --danger: #B3261E;
     --danger-soft: #FBEAE8;
     --danger-soft-hover: #F6D5D1;
+    --up: #C62828;        /* 台股慣例：紅色＝賺 */
+    --down: #2E7D32;      /* 綠色＝賠 */
+    --gold-soft: #F6EBC8;
+    --gold: #8A6A0F;
     --num: "Barlow Condensed", "Noto Sans TC", system-ui, sans-serif;
     --text: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
     box-sizing: border-box;
@@ -37,6 +41,7 @@
       --bg: #141B1F; --paper: #1E282E; --ink: #E6ECEA; --muted: #93A1A8;
       --line: #2E3B42; --accent: #5BC0B4; --accent-soft: #1F3B3A; --danger: #F2827A;
       --danger-soft: #3A2422; --danger-soft-hover: #4A2C29;
+      --up: #F2827A; --down: #7BC47F; --gold-soft: #3A3220; --gold: #E2C26A;
     }
   }
   *, *::before, *::after { box-sizing: inherit; }
@@ -46,7 +51,7 @@
     font-family: var(--text); font-size: 16px; line-height: 1.6;
     -webkit-font-smoothing: antialiased;
   }
-  button, input, select { font: inherit; color: inherit; }
+  button, input, select, textarea { font: inherit; color: inherit; }
   button { cursor: pointer; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .hidden { display: none !important; }
@@ -92,14 +97,16 @@
   }
   .month .month-pick .caret { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 4px; }
 
-  /* 消費趨勢 */
-  .trend { background: var(--paper); border-radius: 12px; padding: 18px 18px 14px; margin-bottom: 22px; }
-  .trend-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .trend-head h3 { margin: 0; font-size: 16px; }
+  /* 卡片（預算、趨勢） */
+  .card, .trend { background: var(--paper); border-radius: 12px; padding: 18px 18px 14px; margin-bottom: 22px; }
+  .card-head, .trend-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .card-head h3, .trend-head h3 { margin: 0; font-size: 16px; }
   .trend-scope { font-size: 13px; color: var(--muted); margin-top: 2px; }
   .seg { display: inline-flex; background: var(--bg); border-radius: 10px; padding: 3px; }
   .seg button { border: 0; background: none; padding: 5px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); }
   .seg button.on { background: var(--paper); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .seg-full { display: flex; }
+  .seg-full button { flex: 1; padding: 8px; font-size: 15px; }
   .trend-chart { position: relative; margin-top: 12px; }
   .trend-chart svg { display: block; width: 100%; height: 200px; overflow: visible; }
   .trend-chart .grid { stroke: var(--line); stroke-width: 1; }
@@ -126,6 +133,26 @@
   .movers span { display: inline-flex; align-items: center; gap: 5px; margin: 4px 12px 0 0; color: var(--ink); }
   .movers i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
+  /* 預算卡片 */
+  .bud-big { font-family: var(--num); font-size: 34px; font-weight: 700; line-height: 1.1; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .bud-big small { font-size: .45em; color: var(--muted); margin-right: 4px; font-weight: 600; }
+  .bud-big.over { color: var(--danger); }
+  .bud-sub { font-size: 13px; color: var(--muted); }
+  .bud-sub b, .bud-lines b { font-family: var(--num); font-size: 15px; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .prog { position: relative; height: 10px; border-radius: 5px; background: var(--bg); margin: 10px 0 6px; overflow: hidden; }
+  .prog > span { display: block; height: 100%; border-radius: 5px; background: var(--accent); }
+  .prog > span.over { background: var(--danger); }
+  .prog > i { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .45; }
+  .bud-lines { display: grid; gap: 4px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .bud-lines .warn, .bud-lines .warn b { color: var(--danger); }
+  .bud-cats { display: grid; gap: 10px; margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 14px; }
+  .bud-cat { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; font-size: 14px; }
+  .bud-cat .prog { margin: 0; height: 8px; }
+  .bud-cat .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bud-cat .v { font-family: var(--num); font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; min-width: 104px; color: var(--muted); }
+  .bud-cat .v b { color: var(--ink); font-weight: 600; font-size: 17px; }
+  .bud-cat .v.over b { color: var(--danger); }
+
   /* 選擇年月 */
   .yr { display: flex; justify-content: space-between; align-items: center; }
   .yr b { font-size: 18px; }
@@ -141,7 +168,7 @@
   .mgrid button.on small { color: inherit; opacity: .85; }
   .month .cycle { font-size: 13px; font-weight: 400; color: var(--muted); }
   .top-actions { display: flex; align-items: center; gap: 8px; }
-  .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 0; background: none; color: var(--ink); display: grid; place-items: center; }
+  .icon-btn { width: 40px; height: 40px; flex: none; border-radius: 50%; border: 0; background: none; color: var(--ink); display: grid; place-items: center; }
   .icon-btn:hover { background: var(--paper); }
   .icon-btn svg { width: 20px; height: 20px; }
   .searchbar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
@@ -156,15 +183,17 @@
   }
   .tip-card ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
   .tip-card .tip-x { margin-left: auto; flex: none; background: none; border: 0; color: var(--accent); font-size: 13px; font-weight: 700; padding: 2px 4px; }
-  /* 消費分析 */
+
+  /* 子頁面（分析、預算、股票、固定支出） */
   .an-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
   .an-head h2 { margin: 0; font-size: 19px; }
+  .an-head .btn-primary { margin-left: auto; min-height: 38px; padding: 0 14px; font-size: 14px; }
   .an-box { background: var(--paper); border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; display: grid; gap: 12px; }
   .an-range { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
-  .an-range select {
+  .an-range select, .st-set select, .st-set input {
     border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--bg); font-size: 15px;
   }
-  .an-range select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .an-range select:focus, .st-set select:focus, .st-set input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   .presets { display: flex; flex-wrap: wrap; gap: 6px; }
   .presets button { border: 1px solid var(--line); background: var(--paper); border-radius: 16px; padding: 4px 12px; font-size: 13px; color: var(--muted); }
   .presets button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -173,12 +202,14 @@
   .an-total small { font-size: .45em; color: var(--muted); margin-right: 4px; }
   .an-meta { font-size: 13px; color: var(--muted); }
   .an-list { background: var(--paper); border-radius: 12px; overflow: hidden; }
-  .an-row {
+  .an-row, .hold {
     display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center;
     width: 100%; padding: 12px 16px; background: none; border: 0; border-top: 1px solid var(--line); text-align: left;
   }
-  .an-row:first-child { border-top: 0; }
-  .an-row:hover { background: var(--accent-soft); }
+  .hold { grid-template-columns: 1fr auto; }
+  .an-row:first-child, .hold:first-child { border-top: 0; }
+  .an-row:hover, .hold:hover { background: var(--accent-soft); }
+  .an-row.old { opacity: .55; }
   .an-rank { font-family: var(--num); font-size: 17px; font-weight: 600; color: var(--muted); text-align: center; }
   .an-bar { height: 4px; border-radius: 2px; margin-top: 6px; background: var(--bg); overflow: hidden; }
   .an-bar span { display: block; height: 100%; border-radius: 2px; }
@@ -186,6 +217,8 @@
   .an-amt b { display: block; font-family: var(--num); font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .an-amt small { font-size: 12px; color: var(--muted); }
   .an-more { width: 100%; margin-top: 12px; }
+  .sec-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 15px; font-weight: 700; margin: 4px 4px 8px; }
+  .sec-h small { font-size: 12px; font-weight: 400; color: var(--muted); }
   .search-sum { background: var(--paper); border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; }
   .search-sum .big { font-family: var(--num); font-size: 34px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .search-sum .big small { font-size: .45em; color: var(--muted); margin-right: 4px; }
@@ -199,6 +232,37 @@
   .sec-title { font-size: 15px; font-weight: 700; margin: 8px 0 0; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 0; overflow: hidden; background: var(--line); }
   .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* 預算規劃頁 */
+  .bp-row { display: grid; grid-template-columns: 1fr 130px; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+  .bp-row:first-child { border-top: 0; }
+  .bp-name { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 15px; }
+  .bp-name small { display: block; font-size: 12px; color: var(--muted); line-height: 1.3; }
+  .num-in {
+    border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--bg);
+    width: 100%; min-width: 0; text-align: right; font-family: var(--num); font-size: 18px; font-variant-numeric: tabular-nums;
+  }
+  textarea.notes {
+    width: 100%; min-height: 180px; resize: vertical; border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px; background: var(--bg); line-height: 1.7;
+  }
+  .num-in:focus, textarea.notes:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .page-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .page-actions button { min-width: 110px; }
+
+  /* 股票 */
+  .up { color: var(--up) !important; }
+  .down { color: var(--down) !important; }
+  .st-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .st-grid div { font-size: 12px; color: var(--muted); min-width: 0; }
+  .st-grid b { display: block; font-family: var(--num); font-size: 20px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .st-set { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); margin: 18px 4px 6px; }
+  .st-set input { width: 76px; }
+  .code { font-family: var(--num); font-size: 14px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+  .tag.div { background: var(--gold-soft); color: var(--gold); }
+  .quote-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin: -8px 4px 18px; }
+  .quote-bar .link-btn { flex: none; }
+  .quote-bar .link-btn:disabled { opacity: .4; cursor: wait; }
 
   /* 收據樣式的總覽 */
   .receipt {
@@ -217,6 +281,8 @@
   .bill-row button { background: var(--danger-soft); color: var(--danger); border: 0; border-radius: 8px; padding: 2px 8px; font-size: 13px; }
   .bill-row button b { color: var(--danger); }
   .bill-row button.on { outline: 2px solid var(--danger); }
+  .pending-who { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 13px; color: var(--muted); background: var(--danger-soft); border-radius: 10px; padding: 8px 12px; }
+  .pending-who b { font-family: var(--num); color: var(--danger); font-size: 16px; font-weight: 600; margin: 0 2px; }
   .amt-wrap { text-align: right; }
   .amt-net { display: block; font-size: 12px; color: var(--muted); }
   .tag.owe { background: var(--danger-soft); color: var(--danger); }
@@ -274,7 +340,7 @@
   }
   .item:first-child { border-top: 0; }
   .item:hover { background: var(--accent-soft); }
-  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   .store { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sub { font-size: 13px; color: var(--muted); }
   .amt { font-family: var(--num); font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -315,7 +381,7 @@
     .dlg-actions button { flex: 1; }
     .dlg-actions .btn-danger { flex-basis: 100%; order: 3; }
   }
-  .field { display: grid; gap: 4px; }
+  .field { display: grid; gap: 4px; min-width: 0; }
   .field label { font-size: 13px; color: var(--muted); }
   .field input, .field select {
     border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
@@ -325,15 +391,17 @@
   .dlg-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 6px; }
   .dlg-actions .btn-danger { margin-right: auto; }
   .info { font-size: 13px; color: var(--muted); background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+  .info b { color: var(--ink); font-family: var(--num); font-size: 16px; }
   .uid { font-family: var(--num); font-size: 15px; word-break: break-all; color: var(--ink); }
   .menu-list { display: grid; gap: 8px; }
+  .menu-list .menu-sep { height: 1px; background: var(--line); margin: 4px 0; }
   .cat-list { display: grid; gap: 8px; max-height: 50vh; overflow-y: auto; padding: 2px; }
   .cat-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 8px; align-items: center; }
   .cat-row input[type=color] { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 10px; padding: 3px; background: var(--bg); cursor: pointer; }
   .cat-row input[type=text] { border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--bg); min-width: 0; width: 100%; }
   .cat-row button { background: none; border: 0; color: var(--danger); padding: 8px; font-size: 14px; }
   .cat-hint { font-size: 13px; color: var(--muted); margin: 0; }
-  .field-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .link-btn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 13px; font-weight: 500; }
   .field small { font-size: 12px; color: var(--muted); }
   .menu-list button { text-align: left; }
@@ -342,7 +410,7 @@
   .toast {
     position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
     background: var(--ink); color: var(--paper); padding: 10px 18px; border-radius: 20px; font-size: 14px;
-    opacity: 0; transition: opacity .2s; pointer-events: none;
+    opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; max-width: calc(100% - 32px); text-align: center;
   }
   .toast.show { opacity: 1; }
   .undo {
@@ -389,13 +457,14 @@
     <div>
       點右上角的<b>頭像</b>，可以使用更多功能：
       <ul>
-        <li>消費分析：選一段期間，看每家店總共花了多少，由高到低排行</li>
-        <li>帳單結帳日：設定你信用卡每期從哪天算到哪天</li>
-        <li>管理分類：新增、改名、刪除分類，和店家自動分類規則</li>
-        <li>匯出本期 CSV：用 Excel 打開</li>
-        <li>刷卡自動匯入：開通後，刷卡通知信會自動記進來</li>
+        <li>預算規劃：設定收入、各分類預算，寫下你的存錢計畫</li>
+        <li>股票投資：記錄買賣和股利，看持股損益</li>
+        <li>固定支出／訂閱：自動找出每個月都會扣的錢</li>
+        <li>消費分析：每家店總共花了多少，由高到低排行</li>
+        <li>帳單結帳日、管理分類、匯出 CSV、刷卡自動匯入</li>
       </ul>
     </div>
+    <button class="tip-x" id="tipX">知道了</button>
   </div>
 
   <div class="searchbar hidden" id="searchBar">
@@ -409,12 +478,15 @@
     <div class="total"><small>NT$</small><span id="total">0</span></div>
     <div class="meta" id="meta"></div>
     <div class="bill-row hidden" id="billRow"></div>
+    <div class="pending-who hidden" id="pendingWho"></div>
     <div class="split hidden" id="split"></div>
     <div class="chart" id="chart">
       <svg class="donut" id="donut" viewBox="0 0 180 180" role="img" aria-label="各分類支出比例"></svg>
       <div class="bars" id="bars"></div>
     </div>
   </section>
+
+  <section class="card hidden" id="budCard"></section>
 
   <section class="trend hidden" id="trend">
     <div class="trend-head">
@@ -438,9 +510,10 @@
   <div id="list"></div>
 </main>
 
+<!-- 店家排行 -->
 <main id="analysis" class="wrap hidden">
   <div class="an-head">
-    <button class="icon-btn" id="btnAnBack" aria-label="返回"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
+    <button class="icon-btn back-btn" aria-label="返回"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
     <h2>店家消費排行</h2>
   </div>
   <div class="an-box">
@@ -458,6 +531,76 @@
   <button class="btn-ghost an-more hidden" id="anMore"></button>
 </main>
 
+<!-- 預算規劃 -->
+<main id="budget" class="wrap hidden">
+  <div class="an-head">
+    <button class="icon-btn back-btn" aria-label="返回"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
+    <h2>預算規劃</h2>
+  </div>
+  <div class="an-box">
+    <p class="sec-title" style="margin:0">收入與目標</p>
+    <div class="row2">
+      <div class="field"><label for="bIncome">每月收入</label><input class="num-in" type="number" id="bIncome" inputmode="numeric" min="0" placeholder="0"></div>
+      <div class="field"><label for="bSave">每月想存</label><input class="num-in" type="number" id="bSave" inputmode="numeric" min="0" placeholder="0"></div>
+    </div>
+    <div class="field">
+      <label for="bTotal">每月總預算（可以花的錢）</label>
+      <input class="num-in" type="number" id="bTotal" inputmode="numeric" min="0" placeholder="不填就用分類預算加總">
+      <small id="bTotalHint"></small>
+    </div>
+  </div>
+  <div class="an-box">
+    <div class="field-head"><p class="sec-title" style="margin:0">各分類預算</p><button class="link-btn" id="bFillAvg">空白的用近 3 期平均填入</button></div>
+    <p class="cat-hint">不想控管的分類留白就好。灰色小字是近 3 期的平均花費，可以參考。</p>
+    <div id="bCats"></div>
+  </div>
+  <div class="an-box">
+    <p class="sec-title" style="margin:0">規劃筆記</p>
+    <p class="cat-hint">寫下這段時間的目標或計畫，只有你自己看得到。</p>
+    <textarea class="notes" id="bNotes" placeholder="例如：&#10;・年底前存到 10 萬&#10;・12 月日本旅遊預算 3 萬，從 11 月開始外食減少&#10;・Netflix 和 Disney+ 留一個就好"></textarea>
+  </div>
+  <div class="page-actions">
+    <button class="btn-cancel" id="btnBudCancel">取消</button>
+    <button class="btn-primary" id="btnBudSave">儲存</button>
+  </div>
+</main>
+
+<!-- 股票投資 -->
+<main id="stocks" class="wrap hidden">
+  <div class="an-head">
+    <button class="icon-btn back-btn" aria-label="返回"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
+    <h2>股票投資</h2>
+    <button class="btn-primary" id="btnStAdd">＋ 新增交易</button>
+  </div>
+  <div class="an-box" id="stSum"></div>
+  <div class="quote-bar" id="quoteBar"></div>
+  <div class="sec-h"><span>目前持股</span><small>點一檔可以更新現價</small></div>
+  <div class="an-list" id="stHold"></div>
+  <div class="sec-h" style="margin-top:22px"><span>交易紀錄</span><small>點一筆可以修改或刪除</small></div>
+  <div class="an-list" id="stTx"></div>
+  <div class="st-set">
+    手續費折扣
+    <select id="stDisc" aria-label="手續費折扣">
+      <option value="10">無折扣</option><option value="6">6 折</option><option value="5">5 折</option>
+      <option value="3.8">3.8 折</option><option value="2.8">2.8 折</option><option value="2">2 折</option><option value="1">1 折</option>
+    </select>
+    最低手續費 <input id="stMin" type="number" inputmode="numeric" min="0" aria-label="最低手續費"> 元
+  </div>
+  <p class="cat-hint" style="margin:0 4px">股票紀錄獨立計算，不會算進每期消費。成本用平均成本法計算；紅色代表賺、綠色代表賠。</p>
+</main>
+
+<!-- 固定支出／訂閱 -->
+<main id="subs" class="wrap hidden">
+  <div class="an-head">
+    <button class="icon-btn back-btn" aria-label="返回"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
+    <h2>固定支出／訂閱</h2>
+  </div>
+  <div class="an-box" id="subSum"></div>
+  <div class="an-list" id="subList"></div>
+  <div class="sec-h hidden" id="subOldH" style="margin-top:22px"><span>最近沒有再扣款</span><small>可能已經取消，確認一下</small></div>
+  <div class="an-list" id="subOld"></div>
+</main>
+
 <button class="fab hidden" id="btnAdd">＋ 記一筆</button>
 
 <dialog id="dlgTx">
@@ -471,7 +614,6 @@
     <div class="field">
       <div class="field-head"><label for="fCat">分類</label><button type="button" class="link-btn" id="btnCatsInline">管理分類</button></div>
       <select id="fCat"></select>
-      <small>想新增、改名或刪除分類，點右上方「管理分類」，或從右上角頭像 →「管理分類」進入。</small>
     </div>
     <label class="check hidden" id="ruleBox"><input type="checkbox" id="fRule"><span id="ruleText"></span></label>
     <div class="back-box">
@@ -495,17 +637,65 @@
   </form>
 </dialog>
 
+<dialog id="dlgStock">
+  <form class="dlg" method="dialog" id="stForm">
+    <div class="dlg-head"><h3 id="stTitle">新增交易</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+    <div class="seg seg-full" id="stType">
+      <button type="button" data-t="buy">買進</button><button type="button" data-t="sell">賣出</button><button type="button" data-t="div">股利</button>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="sDate">日期</label><input type="date" id="sDate" required></div>
+      <div class="field"><label for="sCode">股票代號</label><input id="sCode" required placeholder="例如：2330" autocomplete="off" list="stCodes"></div>
+    </div>
+    <datalist id="stCodes"></datalist>
+    <div class="field"><label for="sName">名稱</label><input id="sName" placeholder="例如：台積電"><small id="sQuote"></small></div>
+    <div class="row2">
+      <div class="field"><label for="sShares" id="sSharesLbl">股數</label><input type="number" id="sShares" inputmode="decimal" step="any" min="0"><small>1 張 = 1,000 股</small></div>
+      <div class="field" id="sPriceF"><label for="sPrice">成交價</label><input type="number" id="sPrice" inputmode="decimal" step="any" min="0"></div>
+    </div>
+    <div class="field hidden" id="sAmountF"><label for="sAmount">現金股利（實際入帳金額）</label><input type="number" id="sAmount" inputmode="decimal" step="any" min="0"></div>
+    <div class="row2" id="stFeeRow">
+      <div class="field"><label for="sFee">手續費</label><input type="number" id="sFee" inputmode="decimal" step="any" min="0"></div>
+      <div class="field" id="sTaxF"><label for="sTax">證交稅</label><input type="number" id="sTax" inputmode="decimal" step="any" min="0"></div>
+    </div>
+    <p class="cat-hint" id="sFeeHint">手續費和證交稅會自動算，和券商對帳單不同的話可以直接改。</p>
+    <div class="field"><label for="sNote">備註</label><input id="sNote" placeholder="選填"></div>
+    <div class="info" id="sSum"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn-danger hidden" id="btnStDelete">刪除</button>
+      <button type="button" class="btn-cancel" id="btnStCancel">取消</button>
+      <button type="submit" class="btn-primary" id="btnStSave">儲存</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgPrice">
+  <form class="dlg" method="dialog" id="prForm">
+    <div class="dlg-head"><h3 id="prTitle">更新現價</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+    <p class="cat-hint">到券商 App 或 Google 查目前股價後填入，用來計算市值和未實現損益。</p>
+    <div class="field"><label for="prPrice">現價</label><input class="num-in" type="number" id="prPrice" inputmode="decimal" step="any" min="0" required></div>
+    <div class="info" id="prHint"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn-cancel" id="btnPrCancel">取消</button>
+      <button type="submit" class="btn-primary">儲存</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="dlgMenu">
   <div class="dlg">
     <div class="dlg-head"><h3 id="menuName"></h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <div class="menu-list">
+      <button class="btn-ghost" id="btnBudget">預算規劃</button>
+      <button class="btn-ghost" id="btnStocks">股票投資</button>
+      <button class="btn-ghost" id="btnSubs">固定支出／訂閱</button>
       <button class="btn-ghost" id="btnAnalysis">消費分析（店家排行）</button>
+      <div class="menu-sep"></div>
       <button class="btn-ghost" id="btnCycle">帳單結帳日</button>
       <button class="btn-ghost" id="btnCats">管理分類</button>
       <button class="btn-ghost" id="btnKey">刷卡自動匯入</button>
       <button class="btn-ghost" id="btnExport">匯出本期 CSV（Excel 可開）</button>
       <button class="btn-cancel" id="btnLogout">登出</button>
-
     </div>
   </div>
 </dialog>
@@ -513,7 +703,7 @@
 <dialog id="dlgCats">
   <div class="dlg">
     <div class="dlg-head"><h3>管理分類</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
-    <p class="cat-hint">點色塊換顏色。改名會一併更新所有用到這個分類的紀錄；刪除後，那些紀錄會變成「未分類」。</p>
+    <p class="cat-hint">點色塊換顏色。改名會一併更新所有用到這個分類的紀錄和預算；刪除後，那些紀錄會變成「未分類」。</p>
     <div class="cat-list" id="catList"></div>
     <button class="btn-ghost" id="btnCatAdd">＋ 新增分類</button>
     <div id="ruleSec">
@@ -605,6 +795,10 @@ const firebaseConfig = {
 // 刷卡自動匯入服務的網址（Apps Script 部署成網頁應用程式後，把網址貼在這裡）
 const IMPORT_SERVICE_URL = "https://script.google.com/macros/s/AKfycbziYRsVgjpKlHL8jcU-DtVg1LlBNV-om6tYse6lolfFv19NxhLmuEEN2JWBj9RPguRm/exec";
 
+// 台股即時股價服務的網址（把 price-proxy.gs 部署成網頁應用程式後，把結尾是 /exec 的網址貼在引號裡）
+// 留空的話，股票頁會改用你手動填的現價
+const PRICE_API_URL = "";
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 // 只有手機／平板（包含加到主畫面的 App）才開本機快取，讓切換帳單期比較快；
@@ -641,8 +835,13 @@ const colorOf = c => (CATEGORIES.find(x => x[0] === c) || [, "#B9C0BC"])[1];
 
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n).toLocaleString("zh-TW");
+const fmtP = n => (+n || 0).toLocaleString("zh-TW", { maximumFractionDigits: 2 });   // 股價、股數可以有小數
+const signed = n => (n > 0 ? "+" : n < 0 ? "−" : "") + fmt(Math.abs(n));
+const upDown = n => (n > 0.5 ? "up" : n < -0.5 ? "down" : "");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pad = n => String(n).padStart(2, "0");
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const dayDiff = (a, b) => Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 864e5);
 const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
 
 // 帳單週期：每期從 CYCLE_DAY 這天開始，到下個月的前一天結束
@@ -671,6 +870,9 @@ function cycleRange({ y, m }) {
 let user = null, unsub = null, txs = [], filter = null, region = null, editingId = null;
 let storeRules = {}, unsubRules = null;       // 店家 → 分類
 let searching = false, allTxs = null, searchQ = "";
+let dupIds = new Set();                       // 可能重複扣款的紀錄
+const EMPTY_BUDGET = { income: 0, save: 0, total: 0, cats: {}, notes: "" };
+let BUDGET = { ...EMPTY_BUDGET }, unsubBudget = null;
 const isAbroad = t => !!t.region && t.region !== "TW";
 const net = t => (+t.amount || 0) - (+t.paidBack || 0);     // 我實際花的 = 金額 − 別人分攤
 const isTwd = t => !t.currency || t.currency === "TWD";
@@ -687,7 +889,20 @@ function setCycleDay(day) {
 }
 let trendN = 6, cycleCache = {}, trendToken = 0;
 const keyOf = c => `${c.y}-${pad(c.m)}`;
-function backCycles(c, k) { let y = c.y, m = c.m - k; while (m < 1) { m += 12; y--; } return { y, m }; }
+function backCycles(c, k) { let y = c.y, m = c.m - k; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } return { y, m }; }
+
+// ===== 頁面切換 =====
+const VIEWS = ["app", "analysis", "budget", "stocks", "subs"];
+function showView(v) {
+  VIEWS.forEach(x => $(x).classList.toggle("hidden", x !== v));
+  $("btnAdd").classList.toggle("hidden", v !== "app");
+  window.scrollTo(0, 0);
+}
+function leaveMain() {
+  if ($("dlgMenu").open) $("dlgMenu").close();
+  if (searching) setSearchMode(false);
+}
+document.querySelectorAll(".back-btn").forEach(b => b.onclick = () => showView("app"));
 
 function fillCatSelect(current) {
   const prev = $("fCat").value;
@@ -698,6 +913,16 @@ function fillCatSelect(current) {
   if (names.includes(prev)) $("fCat").value = prev;
 }
 fillCatSelect();
+
+// 提示卡片：按「知道了」後不再顯示
+let tipHidden = false;
+try { tipHidden = localStorage.getItem("tipHidden") === "1"; } catch (e) {}
+$("tipCard").classList.toggle("hidden", tipHidden);
+$("tipX").onclick = () => {
+  tipHidden = true;
+  $("tipCard").classList.add("hidden");
+  try { localStorage.setItem("tipHidden", "1"); } catch (e) {}
+};
 
 // ===== 登入 =====
 $("btnLogin").onclick = async () => {
@@ -716,18 +941,21 @@ $("btnLogin").onclick = async () => {
 
 // 換帳號或登出時，把上一個帳號留在畫面和記憶體裡的資料全部清掉
 function resetSession() {
-  [unsub, unsubCats, unsubRules].forEach(f => f && f());
-  unsub = unsubCats = unsubRules = null;
+  [unsub, unsubCats, unsubRules, unsubBudget, unsubStocks, unsubStSet].forEach(f => f && f());
+  unsub = unsubCats = unsubRules = unsubBudget = unsubStocks = unsubStSet = null;
   txs = []; allTxs = null; cycleCache = {}; clearAn();
-  storeRules = {}; CATEGORIES = DEFAULT_CATEGORIES;
-  filter = null; region = null; onlyPending = false; editingId = null;
-  anStart = null; anData = null;
+  storeRules = {}; CATEGORIES = DEFAULT_CATEGORIES; BUDGET = { ...EMPTY_BUDGET };
+  stockTxs = []; stocksLoaded = false; stockSet = { prices: {}, discount: 10, minFee: 20 };
+  quotes = {}; quotesAt = ""; quoteErr = "";
+  filter = null; region = null; onlyPending = false; editingId = null; stEditingId = null;
+  anStart = null; anData = null; searchFrom = null;
   ym = { ...CUR };
   if (searching) { searching = false; $("searchBar").classList.add("hidden"); $("searchSum").classList.add("hidden"); $("receipt").classList.remove("hidden"); }
-  $("analysis").classList.add("hidden");
+  ["analysis", "budget", "stocks", "subs"].forEach(v => $(v).classList.add("hidden"));
   document.querySelectorAll("dialog[open]").forEach(d => d.close());
   $("list").innerHTML = ""; $("total").textContent = "…"; $("trend").classList.add("hidden");
-  $("billRow").innerHTML = ""; $("split").innerHTML = "";
+  $("budCard").classList.add("hidden");
+  $("billRow").innerHTML = ""; $("split").innerHTML = ""; $("pendingWho").classList.add("hidden");
 }
 
 onAuthStateChanged(auth, async u => {
@@ -743,12 +971,16 @@ onAuthStateChanged(auth, async u => {
       const list = snap.exists() && snap.data().list;
       CATEGORIES = Array.isArray(list) && list.length ? list.map(x => [x.name, x.color]) : DEFAULT_CATEGORIES;
       fillCatSelect();
-      if (txs.length) render();
+      if (unsub) render();
     });
     unsubRules = onSnapshot(doc(db, "users", u.uid, "settings", "storeRules"), snap => {
       storeRules = {};
       ((snap.exists() && snap.data().list) || []).forEach(r => { if (r.store) storeRules[r.store] = r.category; });
       if ($("dlgCats").open) renderRules();
+    });
+    unsubBudget = onSnapshot(doc(db, "users", u.uid, "settings", "budget"), snap => {
+      BUDGET = { ...EMPTY_BUDGET, ...(snap.exists() ? snap.data() : {}) };
+      if (unsub && !searching) render();
     });
     // 讀這個人的帳單結帳日，再開始載入資料
     try {
@@ -792,16 +1024,32 @@ function shiftMonth(d) {
   ym.m += d;
   if (ym.m < 1) { ym.m = 12; ym.y--; }
   if (ym.m > 12) { ym.m = 1; ym.y++; }
-  filter = null; region = null;
+  filter = null; region = null; onlyPending = false;
   subscribe();
 }
 $("prevMonth").onclick = () => shiftMonth(-1);
 $("nextMonth").onclick = () => shiftMonth(1);
 
+// 同一家店、同金額、同一天、10 分鐘內的刷卡紀錄，可能是重複扣款或重複匯入
+function findDups(list) {
+  const ids = new Set(), g = {};
+  const mins = s => { const [h, m] = String(s || "").split(":").map(Number); return isNaN(h) ? null : h * 60 + (m || 0); };
+  list.forEach(t => { if (t.source === "gmail") (g[`${t.date}|${norm(t.store)}|${t.amount}`] ||= []).push(t); });
+  Object.values(g).forEach(arr => {
+    if (arr.length < 2) return;
+    arr.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+    for (let i = 1; i < arr.length; i++) {
+      const a = mins(arr[i - 1].time), b = mins(arr[i].time);
+      if (a === null || b === null || Math.abs(b - a) <= 10) { ids.add(arr[i - 1].id); ids.add(arr[i].id); }
+    }
+  });
+  return ids;
+}
+
 // ===== 畫面 =====
 function render() {
   if (searching) return renderSearch();
-  const twd = txs.filter(t => !t.currency || t.currency === "TWD");
+  const twd = txs.filter(isTwd);
   const foreign = txs.length - twd.length;
   const total = twd.reduce((s, t) => s + net(t), 0);
   const gross = twd.reduce((s, t) => s + (+t.amount || 0), 0);
@@ -813,9 +1061,10 @@ function render() {
   const pendingList = twd.filter(t => t.backPending && +t.paidBack > 0);
   const pending = pendingList.reduce((s, t) => s + (+t.paidBack || 0), 0);
   if (!pendingList.length) onlyPending = false;
+  dupIds = findDups(txs);
   $("total").textContent = fmt(total);
   $("meta").textContent = txs.length
-    ? `共 ${txs.length} 筆` + (foreign ? `，另有 ${foreign} 筆外幣未計入` : "")
+    ? `共 ${txs.length} 筆` + (foreign ? `，另有 ${foreign} 筆外幣未計入` : "") + (dupIds.size ? `，${dupIds.size} 筆可能重複扣款` : "")
     : "這一期還沒有紀錄";
   $("billRow").classList.toggle("hidden", !txs.length);
   $("billRow").innerHTML =
@@ -824,6 +1073,21 @@ function render() {
     (back ? `<span>別人分攤<b>${fmt(back)}</b></span>` : "") +
     (pending ? `<button id="btnPending" class="${onlyPending ? "on" : ""}">待收<b>${fmt(pending)}</b></button>` : "");
   if (pending) $("btnPending").onclick = () => { onlyPending = !onlyPending; render(); };
+
+  // 待收：依「誰」整理，看誰欠多少、欠多久
+  if (onlyPending && pendingList.length) {
+    const who = {};
+    pendingList.forEach(t => {
+      const k = t.paidBy || "沒寫名字";
+      const w = who[k] ||= { sum: 0, oldest: t.date };
+      w.sum += +t.paidBack || 0;
+      if (t.date < w.oldest) w.oldest = t.date;
+    });
+    const today = ymd(new Date());
+    $("pendingWho").innerHTML = Object.entries(who).sort((a, b) => b[1].sum - a[1].sum)
+      .map(([k, w]) => `<span>${esc(k)}<b>${fmt(w.sum)}</b>（最早一筆 ${Math.max(dayDiff(w.oldest, today), 0)} 天前）</span>`).join("");
+    $("pendingWho").classList.remove("hidden");
+  } else $("pendingWho").classList.add("hidden");
 
   const abroad = twd.filter(isAbroad).reduce((s, t) => s + net(t), 0);
   const btn = (key, v) => `<button data-r="${key}" class="${region === key ? "on" : region ? "dim" : ""}"
@@ -848,17 +1112,19 @@ function render() {
   $("bars").innerHTML = cats.map(([c, v]) => `
     <button class="bar ${filter && filter !== c ? "dim" : ""}" data-cat="${esc(c)}">
       <span class="bar-name">${esc(c)}</span>
-      <span class="bar-track"><span class="bar-fill" style="width:${(v / max * 100).toFixed(1)}%;background:${colorOf(c)}"></span></span>
+      <span class="bar-track"><span class="bar-fill" style="width:${(Math.max(v, 0) / max * 100).toFixed(1)}%;background:${colorOf(c)}"></span></span>
       <span class="bar-amt">${fmt(v)}<span class="bar-pct">${chartTotal ? Math.round(v / chartTotal * 100) : 0}%</span></span>
     </button>`).join("");
   $("bars").querySelectorAll(".bar").forEach(b => b.onclick = () => {
     filter = filter === b.dataset.cat ? null : b.dataset.cat; render();
   });
 
+  renderBudget(twd);
+
   const parts = [region && REGION_NAME[region], filter, onlyPending && "待收"].filter(Boolean);
   $("filterNote").classList.toggle("hidden", !parts.length);
   $("filterText").textContent = parts.length ? `只顯示「${parts.join("・")}」，共 NT$ ${fmt(
-    txs.filter(t => inRegion(t) && (!filter || (t.category || UNCAT) === filter) && (!onlyPending || t.backPending) && (!t.currency || t.currency === "TWD"))
+    txs.filter(t => inRegion(t) && (!filter || (t.category || UNCAT) === filter) && (!onlyPending || t.backPending) && isTwd(t))
        .reduce((s, t) => s + net(t), 0))}` : "";
 
   const shown = txs.filter(t => inRegion(t) && (!filter || (t.category || UNCAT) === filter) && (!onlyPending || (t.backPending && +t.paidBack > 0)));
@@ -872,12 +1138,73 @@ function render() {
   renderTrend();
 }
 
+// ===== 本期預算 =====
+function renderBudget(twd) {
+  const el = $("budCard");
+  if (searching) return el.classList.add("hidden");
+  el.classList.remove("hidden");
+  const catB = Object.entries(BUDGET.cats || {}).filter(([, v]) => +v > 0);
+  const totalB = +BUDGET.total || catB.reduce((s, [, v]) => s + +v, 0);
+  const income = +BUDGET.income || 0, saveGoal = +BUDGET.save || 0;
+  if (!totalB && !income) {
+    el.innerHTML = `<div class="card-head"><h3>預算</h3></div>
+      <p class="bud-sub" style="margin:6px 0 12px">設定每月預算後，這裡會顯示本期還能花多少、每天可以花多少，以及照目前速度會不會超支。</p>
+      <button class="btn-ghost" id="budSet" style="width:100%">設定預算</button>`;
+    $("budSet").onclick = openBudget;
+    return;
+  }
+  const spent = twd.reduce((s, t) => s + net(t), 0);
+  const r = cycleRange(ym);
+  const days = dayDiff(r.start, r.end);
+  const isCurrent = ym.y === CUR.y && ym.m === CUR.m;
+  const today = ymd(new Date());
+  const elapsed = isCurrent ? Math.min(Math.max(dayDiff(r.start, today) + 1, 1), days) : days;
+  const leftDays = days - elapsed + 1;                     // 包含今天
+  const proj = isCurrent && elapsed >= 3 ? spent / elapsed * days : null;
+  const lines = [];
+  let head = "";
+  if (totalB) {
+    const remain = totalB - spent, pct = spent / totalB * 100;
+    head = `
+      <div class="bud-big ${remain < 0 ? "over" : ""}"><small>${remain < 0 ? "已超支 NT$" : isCurrent ? "還可以花 NT$" : "結餘 NT$"}</small>${fmt(Math.abs(remain))}</div>
+      <div class="bud-sub">已花 <b>${fmt(spent)}</b> ／ 預算 <b>${fmt(totalB)}</b>（${Math.round(pct)}%）</div>
+      <div class="prog"><span class="${remain < 0 ? "over" : ""}" style="width:${Math.min(Math.max(pct, 0), 100).toFixed(1)}%"></span>${isCurrent ? `<i style="left:${(elapsed / days * 100).toFixed(1)}%" title="今天"></i>` : ""}</div>`;
+    if (isCurrent && remain > 0) lines.push(`還有 ${leftDays} 天，平均每天可以花 <b>${fmt(remain / leftDays)}</b>`);
+    if (proj !== null) lines.push(proj > totalB
+      ? `<span class="warn">照目前速度，本期預估花 <b>${fmt(proj)}</b>，會超支 <b>${fmt(proj - totalB)}</b></span>`
+      : `照目前速度，本期預估花 <b>${fmt(proj)}</b>，在預算內`);
+  } else {
+    head = `<div class="bud-big"><small>本期已花 NT$</small>${fmt(spent)}</div>`;
+  }
+  if (income) {
+    const use = proj ?? spent;
+    const bal = income - use;
+    let t = `${proj !== null ? "預估本期結餘" : "本期結餘"}（收入 ${fmt(income)} − 支出）<b>${fmt(bal)}</b>`;
+    if (saveGoal) t += bal >= saveGoal ? `，達成存錢目標 ${fmt(saveGoal)}` : `，<span class="warn">離存錢目標還差 <b>${fmt(saveGoal - bal)}</b></span>`;
+    lines.push(t);
+  }
+  const byCat = {};
+  twd.forEach(t => { const c = t.category || UNCAT; byCat[c] = (byCat[c] || 0) + net(t); });
+  const rows = catB.map(([c, b]) => ({ c, b: +b, v: byCat[c] || 0 })).sort((x, y) => y.v / y.b - x.v / x.b);
+  el.innerHTML = `
+    <div class="card-head"><h3>本期預算</h3><button class="link-btn" id="budEdit">編輯預算</button></div>
+    ${head}
+    ${lines.length ? `<div class="bud-lines">${lines.map(l => `<div>${l}</div>`).join("")}</div>` : ""}
+    ${rows.length ? `<div class="bud-cats">${rows.map(x => `
+      <div class="bud-cat">
+        <span class="nm">${esc(x.c)}</span>
+        <div class="prog"><span class="${x.v > x.b ? "over" : ""}" style="width:${Math.min(Math.max(x.v / x.b * 100, 0), 100).toFixed(1)}%;${x.v > x.b ? "" : `background:${colorOf(x.c)}`}"></span></div>
+        <span class="v ${x.v > x.b ? "over" : ""}"><b>${fmt(x.v)}</b> / ${fmt(x.b)}</span>
+      </div>`).join("")}</div>` : ""}`;
+  $("budEdit").onclick = openBudget;
+}
+
 function renderList(shown, pool, withYear) {
   const days = {};
   shown.forEach(t => (days[t.date] ||= []).push(t));
   $("list").innerHTML = Object.entries(days).map(([date, items]) => {
     const d = new Date(date + "T00:00:00");
-    const sum = items.filter(t => !t.currency || t.currency === "TWD").reduce((s, t) => s + net(t), 0);
+    const sum = items.filter(isTwd).reduce((s, t) => s + net(t), 0);
     return `<div class="day">
       <div class="day-head"><span>${withYear ? d.getFullYear() + "/" : ""}${d.getMonth() + 1}/${d.getDate()}（${WEEK[d.getDay()]}）</span><span>NT$ ${fmt(sum)}</span></div>
       <div class="items">${items.map(t => {
@@ -886,6 +1213,7 @@ function renderList(shown, pool, withYear) {
         if (t.time) bits.push(esc(t.time));
         if (t.card) bits.push("卡 " + esc(t.card));
         if (t.region && t.region !== "TW") bits.push(`<span class="tag">海外 ${esc(t.region)}</span>`);
+        if (dupIds.has(t.id)) bits.push(`<span class="tag owe">可能重複扣款</span>`);
         if (+t.paidBack > 0) {
           const who = t.paidBy ? esc(t.paidBy) : "別人";
           bits.push(t.backPending
@@ -893,7 +1221,7 @@ function renderList(shown, pool, withYear) {
             : `<span class="tag">${who} 分攤 ${fmt(t.paidBack)}</span>`);
         }
         if (t.note) bits.push(esc(t.note));
-        const cur = t.currency && t.currency !== "TWD" ? `<small>${esc(t.currency)} </small>` : "";
+        const cur = !isTwd(t) ? `<small>${esc(t.currency)} </small>` : "";
         return `<button class="item" data-id="${t.id}">
           <span class="dot" style="background:${colorOf(cat)}"></span>
           <span style="min-width:0"><div class="store">${esc(t.store || "（無名稱）")}</div><div class="sub">${bits.join("，")}</div></span>
@@ -922,10 +1250,10 @@ function setSearchMode(on, initial = "") {
   $("searchBar").classList.toggle("hidden", !on);
   $("searchSum").classList.toggle("hidden", !on);
   $("receipt").classList.toggle("hidden", on);
-  if (on) $("trend").classList.add("hidden");
+  if (on) { $("trend").classList.add("hidden"); $("budCard").classList.add("hidden"); }
   document.querySelector(".month").style.visibility = on ? "hidden" : "";
   $("btnSearch").classList.toggle("hidden", on);
-  $("tipCard").style.display = on ? "none" : "";
+  $("tipCard").classList.toggle("hidden", on || tipHidden);
   if (on) {
     $("filterNote").classList.add("hidden");
     $("searchInput").value = searchQ = initial;
@@ -948,7 +1276,8 @@ function renderSearch() {
     return;
   }
   const hits = allTxs.filter(t => [t.store, t.note, t.category, t.bankCategory, t.paidBy].some(v => norm(v).includes(q)));
-  const twd = hits.filter(t => !t.currency || t.currency === "TWD");
+  dupIds = findDups(hits);
+  const twd = hits.filter(isTwd);
   const total = twd.reduce((s, t) => s + net(t), 0);
   const first = hits[hits.length - 1]?.date, last = hits[0]?.date;
   $("searchSum").innerHTML = hits.length
@@ -960,6 +1289,24 @@ function renderSearch() {
 }
 
 $("btnSearch").onclick = () => setSearchMode(true);
+let searchFrom = null;                         // 從排行或固定支出點進來搜尋的，取消後回到原頁
+function searchStore(name, from) {
+  showView("app");
+  searchFrom = from;
+  setSearchMode(true, name);
+}
+$("btnSearchClose").onclick = () => {
+  setSearchMode(false);
+  const from = searchFrom;
+  searchFrom = null;
+  if (from === "analysis") openAnalysis();
+  else if (from === "subs") openSubs();
+};
+let searchTimer;
+$("searchInput").oninput = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { searchQ = $("searchInput").value.trim(); renderSearch(); }, 150);
+};
 
 // ===== 消費分析：店家排行 =====
 let anStart = null, anData = null, anShowAll = false, anPreset = "12";
@@ -967,6 +1314,13 @@ const anCache = {};
 function monthsAgo(n) {
   const d = new Date(now.getFullYear(), now.getMonth() - (n - 1), 1);
   return { y: d.getFullYear(), m: d.getMonth() + 1 };
+}
+async function loadSince(start) {
+  if (anCache[start]) return anCache[start];
+  const uid = user.uid;
+  const snap = await getDocs(query(collection(db, "users", uid, "transactions"), where("date", ">=", start)));
+  if (user?.uid !== uid) throw { code: "帳號已切換" };
+  return (anCache[start] = snap.docs.map(d => ({ id: d.id, ...d.data() })));
 }
 function fillAnSelects() {
   let yrs = "";
@@ -978,44 +1332,28 @@ fillAnSelects();
 
 function clearAn() { Object.keys(anCache).forEach(k => delete anCache[k]); }
 function openAnalysis() {
-  if ($("dlgMenu").open) $("dlgMenu").close();
-  if (searching) setSearchMode(false);
-  $("app").classList.add("hidden");
-  $("btnAdd").classList.add("hidden");
-  $("analysis").classList.remove("hidden");
-  window.scrollTo(0, 0);
+  leaveMain();
+  showView("analysis");
   if (!anStart) applyPreset("12"); else loadAnalysis();
-}
-function closeAnalysis() {
-  $("analysis").classList.add("hidden");
-  $("app").classList.remove("hidden");
-  $("btnAdd").classList.remove("hidden");
 }
 function applyPreset(p) {
   anPreset = p;
   if (p === "all") anStart = { y: 2010, m: 1, all: true };
   else if (p === "ytd") anStart = { y: now.getFullYear(), m: 1 };
   else anStart = monthsAgo(+p);
-  $("anYear").value = anStart.all ? now.getFullYear() - 10 : anStart.y;
-  $("anMonth").value = anStart.all ? 1 : anStart.m;
-  if (anStart.all) { $("anYear").value = 2010; }
+  $("anYear").value = anStart.y;
+  $("anMonth").value = anStart.m;
   loadAnalysis();
 }
 async function loadAnalysis() {
   $("anPresets").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.p === anPreset));
   const start = anStart.all ? "0000-00-00" : `${anStart.y}-${pad(anStart.m)}-01`;
   anShowAll = false;
-  if (!anCache[start]) {
-    $("anSum").innerHTML = `<div class="an-meta">計算中…</div>`;
-    $("anList").innerHTML = "";
-    try {
-      const uid = user.uid;
-      const snap = await getDocs(query(collection(db, "users", uid, "transactions"), where("date", ">=", start)));
-      if (user?.uid !== uid) return;
-      anCache[start] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } catch (err) { $("anSum").innerHTML = `<div class="an-meta">讀取失敗：${esc(err.code)}</div>`; return; }
-  }
-  const rows = anCache[start].filter(isTwd);
+  if (!anCache[start]) { $("anSum").innerHTML = `<div class="an-meta">計算中…</div>`; $("anList").innerHTML = ""; }
+  let data;
+  try { data = await loadSince(start); }
+  catch (err) { $("anSum").innerHTML = `<div class="an-meta">讀取失敗：${esc(err.code)}</div>`; return; }
+  const rows = data.filter(isTwd);
   const groups = {};
   rows.forEach(t => {
     const key = norm(t.store) || "（無名稱）";
@@ -1057,13 +1395,501 @@ function renderAnList(total) {
     </button>`).join("") : `<div class="empty">這段期間沒有消費紀錄。</div>`;
   $("anMore").classList.toggle("hidden", anShowAll || anData.length <= LIMIT);
   $("anMore").textContent = `顯示全部 ${anData.length} 家店`;
-  $("anList").querySelectorAll(".an-row").forEach(r => r.onclick = () => {
-    closeAnalysis();
-    searchFromAn = true;
-    setSearchMode(true, r.dataset.store);
-  });
+  $("anList").querySelectorAll(".an-row").forEach(r => r.onclick = () => searchStore(r.dataset.store, "analysis"));
 }
 $("btnAnalysis").onclick = openAnalysis;
+$("anMore").onclick = () => { anShowAll = true; renderAnList(anData.reduce((s, g) => s + g.total, 0)); };
+$("anPresets").querySelectorAll("button").forEach(b => b.onclick = () => applyPreset(b.dataset.p));
+const anPick = () => { anPreset = ""; anStart = { y: +$("anYear").value, m: +$("anMonth").value }; loadAnalysis(); };
+$("anYear").onchange = anPick;
+$("anMonth").onchange = anPick;
+
+// ===== 固定支出／訂閱偵測 =====
+// 規則：過去 13 個月內，同一家店至少 3 個月出現、每月平均不超過 1.5 次、七成以上金額和中位數差不到 15%
+async function openSubs() {
+  leaveMain();
+  showView("subs");
+  const s = monthsAgo(13), start = `${s.y}-${pad(s.m)}-01`;
+  if (!anCache[start]) {
+    $("subSum").innerHTML = `<div class="an-meta">分析中…</div>`;
+    $("subList").innerHTML = ""; $("subOld").innerHTML = ""; $("subOldH").classList.add("hidden");
+  }
+  let data;
+  try { data = await loadSince(start); }
+  catch (err) { $("subSum").innerHTML = `<div class="an-meta">讀取失敗：${esc(err.code)}</div>`; return; }
+  const cut = ymd(new Date(Date.now() - 45 * 864e5));
+  const groups = {};
+  data.filter(t => isTwd(t) && +t.amount > 0).forEach(t => (groups[norm(t.store) || "?"] ||= []).push(t));
+  const found = [];
+  Object.values(groups).forEach(list => {
+    const months = new Set(list.map(t => t.date.slice(0, 7)));
+    if (months.size < 3 || list.length / months.size > 1.5) return;
+    const amts = list.map(t => +t.amount).sort((a, b) => a - b);
+    const med = amts[Math.floor(amts.length / 2)];
+    if (!med || amts.filter(a => Math.abs(a - med) / med <= .15).length / amts.length < .7) return;
+    list.sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
+    const lastT = list[list.length - 1], prevT = list[list.length - 2];
+    const diff = +lastT.amount - +prevT.amount;
+    found.push({
+      name: lastT.store || "（無名稱）", cat: lastT.category || UNCAT,
+      monthly: med * list.length / months.size, months: months.size,
+      last: lastT.date, active: lastT.date >= cut,
+      change: Math.abs(diff) >= 5 && Math.abs(diff) / +prevT.amount > .03 ? { from: +prevT.amount, to: +lastT.amount } : null,
+    });
+  });
+  const active = found.filter(f => f.active).sort((a, b) => b.monthly - a.monthly);
+  const old = found.filter(f => !f.active).sort((a, b) => b.monthly - a.monthly);
+  const sum = active.reduce((s, f) => s + f.monthly, 0);
+  $("subSum").innerHTML = active.length ? `
+    <div class="an-meta">每個月固定會花的錢，大約</div>
+    <div class="an-total"><small>NT$</small>${fmt(sum)}</div>
+    <div class="an-meta">一年約 NT$ ${fmt(sum * 12)}，共 ${active.length} 項。依過去 13 個月的紀錄自動判斷，可能也包含房租、保險、電信費。點一項可以看每一筆明細。</div>`
+    : `<div class="an-meta">過去 13 個月還找不到固定支出。同一家店要有至少 3 個月、金額相近的紀錄才會列出來。</div>`;
+  const row = f => `
+    <button class="an-row ${f.active ? "" : "old"}" data-store="${esc(f.name)}">
+      <span class="dot" style="background:${colorOf(f.cat)};justify-self:center"></span>
+      <span style="min-width:0">
+        <div class="store">${esc(f.name)}</div>
+        <div class="sub">${esc(f.cat)}，13 個月內有 ${f.months} 個月，上次 ${f.last.slice(5).replace("-", "/")}${f.change
+          ? `，<span class="tag ${f.change.to > f.change.from ? "owe" : ""}">${f.change.to > f.change.from ? "漲價" : "降價"} ${fmt(f.change.from)} → ${fmt(f.change.to)}</span>` : ""}</div>
+      </span>
+      <span class="an-amt"><b>${fmt(f.monthly)}</b><small>每月・一年 ${fmt(f.monthly * 12)}</small></span>
+    </button>`;
+  $("subList").innerHTML = active.map(row).join("");
+  $("subOld").innerHTML = old.map(row).join("");
+  $("subOldH").classList.toggle("hidden", !old.length);
+  document.querySelectorAll("#subList .an-row, #subOld .an-row").forEach(r => r.onclick = () => searchStore(r.dataset.store, "subs"));
+}
+$("btnSubs").onclick = openSubs;
+
+// ===== 預算規劃 =====
+let budAvg = {};
+function openBudget() {
+  leaveMain();
+  showView("budget");
+  $("bIncome").value = +BUDGET.income || "";
+  $("bSave").value = +BUDGET.save || "";
+  $("bTotal").value = +BUDGET.total || "";
+  $("bNotes").value = BUDGET.notes || "";
+  budAvg = {};
+  drawBudgetCats();
+  // 算近 3 期（不含本期）的平均，給你參考
+  const prev = [1, 2, 3].map(k => backCycles(CUR, k));
+  loadCycles(prev).then(() => {
+    const sums = {};
+    prev.forEach(c => (cycleCache[keyOf(c)] || []).filter(isTwd).forEach(t => {
+      const k = t.category || UNCAT; sums[k] = (sums[k] || 0) + net(t);
+    }));
+    Object.keys(sums).forEach(k => budAvg[k] = sums[k] / 3);
+    budAvg.__total = Object.values(sums).reduce((a, b) => a + b, 0) / 3;
+    if (!$("budget").classList.contains("hidden")) drawBudgetCats(true);
+  }).catch(() => {});
+}
+function drawBudgetCats(keepValues) {
+  const vals = {};
+  if (keepValues) $("bCats").querySelectorAll("input").forEach(i => vals[i.dataset.cat] = i.value);
+  $("bCats").innerHTML = CATEGORIES.map(([c, col]) => {
+    const v = keepValues ? vals[c] : (+BUDGET.cats?.[c] || "");
+    const avg = budAvg[c];
+    return `<div class="bp-row">
+      <span class="bp-name"><span class="dot" style="background:${col}"></span><span>${esc(c)}${avg ? `<small>近 3 期平均 ${fmt(avg)}</small>` : ""}</span></span>
+      <input class="num-in" type="number" inputmode="numeric" min="0" placeholder="不限" data-cat="${esc(c)}" value="${esc(v ?? "")}" aria-label="${esc(c)}預算">
+    </div>`;
+  }).join("");
+  $("bCats").querySelectorAll("input").forEach(i => i.oninput = budgetHint);
+  budgetHint();
+}
+function budgetHint() {
+  const catSum = [...$("bCats").querySelectorAll("input")].reduce((s, i) => s + (+i.value || 0), 0);
+  const inc = +$("bIncome").value || 0, sv = +$("bSave").value || 0;
+  const bits = [];
+  if (catSum) bits.push(`分類預算加總 ${fmt(catSum)}`);
+  if (inc) bits.push(`收入 − 想存 = 最多可以花 ${fmt(inc - sv)}`);
+  if (budAvg.__total) bits.push(`近 3 期平均每期花 ${fmt(budAvg.__total)}`);
+  const tot = +$("bTotal").value || catSum;
+  if (inc && tot > inc - sv) bits.push(`⚠ 預算比可以花的多了 ${fmt(tot - (inc - sv))}`);
+  $("bTotalHint").textContent = bits.join("；");
+}
+["bIncome", "bSave", "bTotal"].forEach(id => $(id).oninput = budgetHint);
+$("bFillAvg").onclick = () => {
+  let n = 0;
+  $("bCats").querySelectorAll("input").forEach(i => {
+    const a = budAvg[i.dataset.cat];
+    if (!i.value && a > 0) { i.value = Math.ceil(a / 100) * 100; n++; }
+  });
+  budgetHint();
+  toast(n ? `填入了 ${n} 個分類，可以再調整` : "沒有可以填入的（近 3 期沒有資料，或已經都填了）");
+};
+$("btnBudget").onclick = openBudget;
+$("btnBudCancel").onclick = () => showView("app");
+$("btnBudSave").onclick = async () => {
+  const cats = {};
+  $("bCats").querySelectorAll("input").forEach(i => { if (+i.value > 0) cats[i.dataset.cat] = +i.value; });
+  const data = {
+    income: +$("bIncome").value || 0, save: +$("bSave").value || 0, total: +$("bTotal").value || 0,
+    cats, notes: $("bNotes").value, updatedAt: serverTimestamp(),
+  };
+  $("btnBudSave").disabled = true;
+  try {
+    await setDoc(doc(db, "users", user.uid, "settings", "budget"), data);
+    BUDGET = { ...EMPTY_BUDGET, ...data };
+    showView("app");
+    render();
+    toast("預算已儲存");
+  } catch (err) {
+    toast("儲存失敗：" + err.code);
+  } finally {
+    $("btnBudSave").disabled = false;
+  }
+};
+
+// ===== 股票投資 =====
+let stockTxs = [], stocksLoaded = false, unsubStocks = null, unsubStSet = null;
+let stockSet = { prices: {}, discount: 10, minFee: 20 };
+let stEditingId = null, stType = "buy", feeTouched = false, taxTouched = false, priceCode = null;
+
+function ensureStocks() {
+  if (unsubStocks) return;
+  const uid = user.uid;
+  unsubStocks = onSnapshot(collection(db, "users", uid, "stocks"), snap => {
+    stockTxs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    stocksLoaded = true;
+    renderStocks();
+  }, err => { $("stSum").innerHTML = `<div class="an-meta">無法讀取：${esc(err.code)}</div>`; });
+  unsubStSet = onSnapshot(doc(db, "users", uid, "settings", "stocks"), snap => {
+    const d = snap.exists() ? snap.data() : {};
+    stockSet = { prices: d.prices || {}, discount: d.discount ?? 10, minFee: d.minFee ?? 20 };
+    renderStocks();
+  });
+}
+function openStocks() {
+  leaveMain();
+  showView("stocks");
+  ensureStocks();
+  renderStocks();
+  refreshQuotes(false);
+}
+$("btnStocks").onclick = openStocks;
+
+// ===== 即時股價（透過 Apps Script 股價服務） =====
+let quotes = {}, quotesAt = "", quoteBusy = false, quoteErr = "";
+const chg = v => v > 0 ? `▲${fmtP(v)}` : v < 0 ? `▼${fmtP(-v)}` : "平盤";
+const pctTxt = v => v === null || v === undefined ? "" : `${v > 0 ? "+" : ""}${(+v).toFixed(2)}%`;
+const holdingCodes = () => Object.values(calcHoldings().H).filter(h => h.shares > 0).map(h => h.code);
+async function fetchQuotes(codes) {
+  const r = await fetch(PRICE_API_URL + "?codes=" + encodeURIComponent(codes.join(",")));
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || "讀取失敗");
+  Object.assign(quotes, j.quotes || {});
+  quotesAt = j.at || "";
+  return j.quotes || {};
+}
+async function refreshQuotes(manual) {
+  if (!PRICE_API_URL) { if (manual) toast("還沒設定股價服務網址"); return; }
+  if (!stocksLoaded) { setTimeout(() => refreshQuotes(manual), 800); return; }   // 等持股資料載入
+  const codes = holdingCodes();
+  if (!codes.length || quoteBusy) return;
+  quoteBusy = true;
+  renderQuoteBar();
+  try {
+    await fetchQuotes(codes);
+    quoteErr = "";
+    if (manual) toast("股價已更新");
+  } catch (e) {
+    quoteErr = e.message || String(e);
+    if (manual) toast("股價更新失敗：" + quoteErr);
+  } finally {
+    quoteBusy = false;
+    renderStocks();
+  }
+}
+// 開盤時間（週一到週五 9:00–13:30）停在股票頁，每分鐘自動更新
+const isTradingTime = () => { const t = new Date(), m = t.getHours() * 60 + t.getMinutes(); return t.getDay() >= 1 && t.getDay() <= 5 && m >= 540 && m <= 815; };
+setInterval(() => {
+  if (user && !$("stocks").classList.contains("hidden") && !document.hidden && isTradingTime()) refreshQuotes(false);
+}, 60000);
+function renderQuoteBar() {
+  const el = $("quoteBar");
+  if (!PRICE_API_URL) {
+    el.innerHTML = `<span>還沒設定自動股價，目前用你手動填的價格。設定方式請看 price-proxy.gs 開頭的說明。</span>`;
+    return;
+  }
+  const srcs = new Set(Object.values(quotes).map(q => q.src));
+  const kind = srcs.has("realtime") ? (isTradingTime() ? "盤中即時（開盤時每分鐘更新）" : "最新成交價") : srcs.size ? "收盤價" : "";
+  el.innerHTML = `<span>${quoteBusy ? "股價更新中…" : quoteErr ? `<span class="uncat">股價更新失敗：${esc(quoteErr)}</span>` : quotesAt ? `股價更新於 ${esc(quotesAt.slice(5, 16).replace("-", "/"))}${kind ? `・${kind}` : ""}` : ""}</span>
+    <button class="link-btn" id="btnQuote" ${quoteBusy ? "disabled" : ""}>更新股價</button>`;
+  $("btnQuote").onclick = () => refreshQuotes(true);
+}
+
+// 平均成本法：買進加成本，賣出依平均成本扣掉並算已實現損益
+function calcHoldings() {
+  const sorted = [...stockTxs].sort((a, b) => a.date.localeCompare(b.date) || (a.seq || 0) - (b.seq || 0));
+  const H = {};
+  let realized = 0, divs = 0, costs = 0;
+  sorted.forEach(t => {
+    const code = String(t.code || "").toUpperCase();
+    const h = H[code] ||= { code, name: code, shares: 0, cost: 0, realized: 0, divs: 0 };
+    if (t.name) h.name = t.name;
+    const s = +t.shares || 0, p = +t.price || 0, fee = +t.fee || 0, tax = +t.tax || 0;
+    if (t.type === "buy") { h.shares += s; h.cost += s * p + fee; }
+    else if (t.type === "sell") {
+      const q = Math.min(s, h.shares), avg = h.shares ? h.cost / h.shares : 0;
+      const r = q * p - fee - tax - avg * q;
+      h.realized += r; realized += r;
+      h.cost -= avg * q; h.shares -= q;
+      if (h.shares < 1e-9) { h.shares = 0; h.cost = 0; }
+    } else if (t.type === "div") {
+      const a = +t.amount || 0;
+      h.divs += a; divs += a; h.shares += s;          // 配股：股數增加、成本不變
+    }
+    costs += fee + tax;
+  });
+  return { H, realized, divs, costs };
+}
+
+function renderStocks() {
+  if ($("stocks").classList.contains("hidden")) return;
+  $("stDisc").value = String(stockSet.discount);
+  $("stMin").value = stockSet.minFee;
+  if (!stocksLoaded) { $("stSum").innerHTML = `<div class="an-meta">載入中…</div>`; $("stHold").innerHTML = ""; $("stTx").innerHTML = ""; return; }
+  const { H, realized, divs, costs } = calcHoldings();
+  renderQuoteBar();
+  // 現價：自動抓到的優先，抓不到才用手動填的
+  const holds = Object.values(H).filter(h => h.shares > 0).map(h => {
+    const q = quotes[h.code];
+    const manual = stockSet.prices[h.code];
+    const price = q?.price ?? manual?.price ?? null;
+    const value = price !== null ? h.shares * price : null;
+    const today = q && q.change !== null && q.change !== undefined ? h.shares * q.change : null;
+    return { ...h, name: h.name === h.code && q?.name ? q.name : h.name, q, manual, price, value, today, pl: value !== null ? value - h.cost : null };
+  }).sort((a, b) => (b.value ?? b.cost) - (a.value ?? a.cost));
+  const cost = holds.reduce((s, h) => s + h.cost, 0);
+  const value = holds.reduce((s, h) => s + (h.value ?? h.cost), 0);
+  const priced = holds.filter(h => h.pl !== null);
+  const pl = priced.reduce((s, h) => s + h.pl, 0);
+  const plBase = priced.reduce((s, h) => s + h.cost, 0);
+  const missing = holds.length - priced.length;
+  const withToday = holds.filter(h => h.today !== null);
+  const today = withToday.reduce((s, h) => s + h.today, 0);
+  const todayBase = withToday.reduce((s, h) => s + h.value - h.today, 0);
+  $("stSum").innerHTML = stockTxs.length ? `
+    <div>
+      <div class="an-meta">持股市值</div>
+      <div class="an-total"><small>NT$</small>${fmt(value)}</div>
+      ${withToday.length ? `<div class="an-meta">今日 <b class="${upDown(today)}" style="font-family:var(--num);font-size:17px">${signed(today)}</b> <span class="${upDown(today)}">${todayBase ? pctTxt(today / todayBase * 100) : ""}</span></div>` : ""}
+      <div class="an-meta">${holds.length} 檔，投入成本 ${fmt(cost)}${missing ? `，<span class="uncat">${missing} 檔還沒有現價，市值暫時用成本算</span>` : ""}</div>
+    </div>
+    <div class="st-grid">
+      <div>未實現損益<b class="${upDown(pl)}">${signed(pl)}</b><small class="${upDown(pl)}">${plBase ? (pl >= 0 ? "+" : "") + (pl / plBase * 100).toFixed(2) + "%" : "—"}</small></div>
+      <div>已實現損益<b class="${upDown(realized)}">${signed(realized)}</b></div>
+      <div>累計股利<b>${fmt(divs)}</b></div>
+      <div>總損益（含股利）<b class="${upDown(pl + realized + divs)}">${signed(pl + realized + divs)}</b><small>手續費和稅共 ${fmt(costs)}</small></div>
+    </div>`
+    : `<div class="an-meta">還沒有股票紀錄。按右上角「新增交易」記下你的第一筆買進，就會開始幫你算持股成本和損益。</div>`;
+
+  $("stHold").innerHTML = holds.length ? holds.map(h => `
+    <button class="hold" data-code="${esc(h.code)}">
+      <span style="min-width:0">
+        <div class="store">${esc(h.name)}<span class="code">${esc(h.code)}</span></div>
+        <div class="sub">${fmtP(h.shares)} 股，均價 ${fmtP(h.cost / h.shares)}${h.q
+          ? `，現價 <b style="color:var(--ink)">${fmtP(h.q.price)}</b> <span class="${upDown(h.q.change)}">${h.q.change !== null && h.q.change !== undefined ? `${chg(h.q.change)}（${pctTxt(h.q.pct)}）` : ""}</span>`
+          : h.manual
+          ? `，現價 ${fmtP(h.manual.price)}（手動，${esc(String(h.manual.at || "").slice(5).replace("-", "/"))}）`
+          : `，<span class="uncat">點這裡填現價</span>`}</div>
+        ${h.today !== null ? `<div class="sub">今日 <span class="${upDown(h.today)}">${signed(h.today)}</span></div>` : ""}
+      </span>
+      <span class="an-amt"><b>${fmt(h.value ?? h.cost)}</b>${h.pl !== null
+        ? `<small class="${upDown(h.pl)}">${signed(h.pl)}（${h.cost ? (h.pl >= 0 ? "+" : "") + (h.pl / h.cost * 100).toFixed(1) : 0}%）</small>`
+        : `<small>成本</small>`}</span>
+    </button>`).join("") : `<div class="empty" style="padding:24px">目前沒有持股</div>`;
+  $("stHold").querySelectorAll(".hold").forEach(b => b.onclick = () => openPrice(b.dataset.code));
+
+  const TYPE = { buy: ["買進", ""], sell: ["賣出", "owe"], div: ["股利", "div"] };
+  const list = [...stockTxs].sort((a, b) => b.date.localeCompare(a.date) || (b.seq || 0) - (a.seq || 0));
+  $("stTx").innerHTML = list.length ? list.map(t => {
+    const [tn, tc] = TYPE[t.type] || TYPE.buy;
+    const s = +t.shares || 0, p = +t.price || 0, fee = +t.fee || 0, tax = +t.tax || 0;
+    const money = t.type === "buy" ? -(s * p + fee) : t.type === "sell" ? s * p - fee - tax : +t.amount || 0;
+    const detail = t.type === "div"
+      ? [`現金 ${fmt(t.amount || 0)}`, s ? `配股 ${fmtP(s)} 股` : ""].filter(Boolean).join("，")
+      : `${fmtP(s)} 股 @ ${fmtP(p)}`;
+    return `<button class="hold" data-id="${t.id}">
+      <span style="min-width:0">
+        <div class="store"><span class="tag ${tc}">${tn}</span> ${esc(t.name || t.code)}<span class="code">${esc(t.code)}</span></div>
+        <div class="sub">${t.date.replaceAll("-", "/")}，${detail}${t.note ? "，" + esc(t.note) : ""}</div>
+      </span>
+      <span class="an-amt"><b>${signed(money)}</b></span>
+    </button>`;
+  }).join("") : "";
+  $("stTx").querySelectorAll(".hold").forEach(b => b.onclick = () => openStockTx(stockTxs.find(t => t.id === b.dataset.id)));
+
+  // 代號自動完成
+  const names = {};
+  stockTxs.forEach(t => { if (t.code) names[String(t.code).toUpperCase()] = t.name || ""; });
+  $("stCodes").innerHTML = Object.entries(names).map(([c, n]) => `<option value="${esc(c)}">${esc(n)}</option>`).join("");
+}
+
+const saveStockSet = async data => {
+  try { await setDoc(doc(db, "users", user.uid, "settings", "stocks"), { ...data, updatedAt: serverTimestamp() }, { merge: true }); }
+  catch (err) { toast("儲存失敗：" + err.code); }
+};
+$("stDisc").onchange = () => saveStockSet({ discount: +$("stDisc").value });
+$("stMin").onchange = () => saveStockSet({ minFee: Math.max(+$("stMin").value || 0, 0) });
+
+function setStType(t) {
+  stType = t;
+  $("stType").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+  const isDiv = t === "div";
+  $("sPriceF").classList.toggle("hidden", isDiv);
+  $("sAmountF").classList.toggle("hidden", !isDiv);
+  $("stFeeRow").classList.toggle("hidden", isDiv);
+  $("sFeeHint").classList.toggle("hidden", isDiv);
+  $("sTaxF").classList.toggle("hidden", t !== "sell");
+  $("sSharesLbl").textContent = isDiv ? "配股股數（選填）" : "股數";
+  calcStock();
+}
+$("stType").querySelectorAll("button").forEach(b => b.onclick = () => setStType(b.dataset.t));
+
+// 台股手續費 0.1425% × 折扣（有最低金額）；證交稅：股票 0.3%、ETF（代號 00 開頭）0.1%
+function calcStock() {
+  const s = +$("sShares").value || 0, p = +$("sPrice").value || 0, amt = s * p;
+  const code = $("sCode").value.trim();
+  if (stType !== "div") {
+    if (!feeTouched) $("sFee").value = amt > 0 ? Math.max(Math.floor(amt * 0.001425 * stockSet.discount / 10), stockSet.minFee) : "";
+    if (!taxTouched) $("sTax").value = stType === "sell" && amt > 0 ? Math.floor(amt * (/^00/.test(code) ? 0.001 : 0.003)) : "";
+  }
+  const fee = +$("sFee").value || 0, tax = +$("sTax").value || 0;
+  let html = "";
+  if (stType === "buy" && amt) html = `買進總成本 <b>NT$ ${fmt(amt + fee)}</b>`;
+  if (stType === "sell" && amt) {
+    html = `賣出實拿 <b>NT$ ${fmt(amt - fee - tax)}</b>`;
+    const h = !stEditingId && calcHoldings().H[code.toUpperCase()];
+    if (h && h.shares) {
+      const q = Math.min(s, h.shares), gain = q * p - fee - tax - h.cost / h.shares * q;
+      html += `，預估損益 <b class="${upDown(gain)}">${signed(gain)}</b>（持股 ${fmtP(h.shares)} 股，均價 ${fmtP(h.cost / h.shares)}）`;
+    }
+  }
+  if (stType === "div" && +$("sAmount").value) html = `股利入帳 <b>NT$ ${fmt(+$("sAmount").value)}</b>`;
+  $("sSum").innerHTML = html;
+  $("sSum").classList.toggle("hidden", !html);
+}
+["sShares", "sPrice", "sAmount"].forEach(id => $(id).addEventListener("input", calcStock));
+$("sCode").addEventListener("input", () => {
+  const code = $("sCode").value.trim().toUpperCase();
+  const known = stockTxs.find(t => String(t.code).toUpperCase() === code && t.name);
+  if (known && !$("sName").value) $("sName").value = known.name;
+  calcStock();
+  lookupCode(code);
+});
+// 輸入代號後查現價：自動帶入名稱，新增買進或賣出時預先填入現價
+let lookupTimer;
+function showCodeQuote(code, q) {
+  if ($("sCode").value.trim().toUpperCase() !== code) return;
+  if (!q) { $("sQuote").textContent = code.length >= 4 ? "查不到這個代號的股價，請確認代號" : ""; return; }
+  if (!$("sName").value) $("sName").value = q.name || "";
+  if (!stEditingId && stType !== "div" && !$("sPrice").value) { $("sPrice").value = q.price; calcStock(); }
+  $("sQuote").innerHTML = `目前 <b>${fmtP(q.price)}</b> <span class="${upDown(q.change)}">${q.change !== null && q.change !== undefined ? `${chg(q.change)}（${pctTxt(q.pct)}）` : ""}</span>${q.src === "close" ? "・收盤價" : ""}`;
+}
+function lookupCode(code) {
+  clearTimeout(lookupTimer);
+  $("sQuote").textContent = "";
+  if (!PRICE_API_URL || !/^[0-9A-Z]{4,6}$/.test(code)) return;
+  if (quotes[code]) return showCodeQuote(code, quotes[code]);
+  lookupTimer = setTimeout(async () => {
+    $("sQuote").textContent = "查詢股價中…";
+    try { const got = await fetchQuotes([code]); showCodeQuote(code, got[code]); }
+    catch (e) { if ($("sCode").value.trim().toUpperCase() === code) $("sQuote").textContent = "股價查詢失敗，可以自己填成交價"; }
+  }, 500);
+}
+$("sFee").addEventListener("input", () => { feeTouched = true; calcStock(); });
+$("sTax").addEventListener("input", () => { taxTouched = true; calcStock(); });
+
+function openStockTx(t) {
+  stEditingId = t?.id || null;
+  $("stTitle").textContent = t ? "修改交易" : "新增交易";
+  $("sDate").value = t?.date || ymd(new Date());
+  $("sCode").value = t?.code || "";
+  $("sName").value = t?.name || "";
+  $("sQuote").textContent = "";
+  $("sShares").value = +t?.shares || "";
+  $("sPrice").value = +t?.price || "";
+  $("sAmount").value = +t?.amount || "";
+  $("sFee").value = t ? (+t.fee || "") : "";
+  $("sTax").value = t ? (+t.tax || "") : "";
+  $("sNote").value = t?.note || "";
+  feeTouched = taxTouched = !!t;
+  $("btnStDelete").classList.toggle("hidden", !t);
+  setStType(t?.type || "buy");
+  $("dlgStock").showModal();
+  if (!t) $("sCode").focus();
+}
+$("btnStAdd").onclick = () => openStockTx();
+$("btnStCancel").onclick = () => $("dlgStock").close();
+
+$("stForm").onsubmit = async e => {
+  e.preventDefault();
+  const code = $("sCode").value.trim().toUpperCase();
+  const data = {
+    type: stType, date: $("sDate").value, code, name: $("sName").value.trim(),
+    shares: parseFloat($("sShares").value) || 0,
+    price: stType === "div" ? 0 : parseFloat($("sPrice").value) || 0,
+    fee: stType === "div" ? 0 : parseFloat($("sFee").value) || 0,
+    tax: stType === "sell" ? parseFloat($("sTax").value) || 0 : 0,
+    amount: stType === "div" ? parseFloat($("sAmount").value) || 0 : 0,
+    note: $("sNote").value.trim(),
+  };
+  if (!data.date || !code) return;
+  if (stType !== "div" && (!data.shares || !data.price)) return toast("請填股數和成交價");
+  if (stType === "div" && !data.amount && !data.shares) return toast("請填現金股利或配股股數");
+  if (stType === "sell" && !stEditingId) {
+    const held = calcHoldings().H[code]?.shares || 0;
+    if (data.shares > held + 1e-9) return toast(held ? `${code} 目前只有 ${fmtP(held)} 股` : `目前沒有 ${code} 的持股紀錄，請先記買進`);
+  }
+  $("btnStSave").disabled = true;
+  try {
+    const col = collection(db, "users", user.uid, "stocks");
+    if (stEditingId) await updateDoc(doc(col, stEditingId), { ...data, updatedAt: serverTimestamp() });
+    else await addDoc(col, { ...data, seq: Date.now(), createdAt: serverTimestamp() });
+    $("dlgStock").close();
+    toast(stEditingId ? "已儲存" : "已新增");
+  } catch (err) {
+    toast("儲存失敗：" + err.code);
+  } finally {
+    $("btnStSave").disabled = false;
+  }
+};
+$("btnStDelete").onclick = async () => {
+  if (!stEditingId || !confirm("確定要刪除這筆交易嗎？")) return;
+  const id = stEditingId;
+  const old = stockTxs.find(t => t.id === id);
+  const { id: _omit, ...backup } = old || {};
+  try {
+    await deleteDoc(doc(db, "users", user.uid, "stocks", id));
+    $("dlgStock").close();
+    if (old) showUndo(`已刪除「${old.name || old.code}」交易`, () => setDoc(doc(db, "users", user.uid, "stocks", id), backup).then(() => toast("已復原")));
+  } catch (err) { toast("刪除失敗：" + err.code); }
+};
+
+function openPrice(code) {
+  priceCode = code;
+  const h = calcHoldings().H[code];
+  const pr = stockSet.prices[code];
+  $("prTitle").textContent = `${h?.name || code} 現價`;
+  $("prPrice").value = pr?.price || "";
+  const q = quotes[code];
+  $("prHint").innerHTML = (h ? `持有 ${fmtP(h.shares)} 股，均價 <b>${fmtP(h.cost / h.shares)}</b>${pr ? `，上次手動更新 ${esc(pr.at)}` : ""}` : "")
+    + (q ? `<br>已自動抓到現價 <b>${fmtP(q.price)}</b>，手動填的價格只會在抓不到時使用。` : "");
+  $("dlgPrice").showModal();
+  $("prPrice").focus();
+}
+$("btnPrCancel").onclick = () => $("dlgPrice").close();
+$("prForm").onsubmit = async e => {
+  e.preventDefault();
+  const price = parseFloat($("prPrice").value);
+  if (!(price > 0) || !priceCode) return;
+  await saveStockSet({ prices: { [priceCode]: { price, at: ymd(new Date()) } } });
+  $("dlgPrice").close();
+};
 
 // ===== 帳單結帳日 =====
 // 選單的值 = 結帳日；存的 cycleDay = 結帳日的隔天（月底結帳 → 1，也就是自然月）
@@ -1101,28 +1927,11 @@ $("btnCycleSave").onclick = async () => {
   }
 };
 
-
-$("btnAnBack").onclick = closeAnalysis;
-$("anMore").onclick = () => { anShowAll = true; renderAnList(anData.reduce((s, g) => s + g.total, 0)); };
-$("anPresets").querySelectorAll("button").forEach(b => b.onclick = () => applyPreset(b.dataset.p));
-const anPick = () => { anPreset = ""; anStart = { y: +$("anYear").value, m: +$("anMonth").value }; loadAnalysis(); };
-$("anYear").onchange = anPick;
-$("anMonth").onchange = anPick;
-let searchFromAn = false;
-$("btnSearchClose").onclick = () => {
-  setSearchMode(false);
-  if (searchFromAn) { searchFromAn = false; openAnalysis(); }   // 從排行點進來的，取消後回到排行
-};
-let searchTimer;
-$("searchInput").oninput = () => {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => { searchQ = $("searchInput").value.trim(); renderSearch(); }, 150);
-};
 function renderDonut(cats, total) {
   const R = 66, C = 2 * Math.PI * R;
   let acc = 0;
   const segs = cats.map(([c, v]) => {
-    const len = total ? v / total * C : 0;
+    const len = total > 0 ? Math.max(v, 0) / total * C : 0;
     const gap = cats.length > 1 && len > 4 ? 2 : 0;
     const el = `<circle class="seg ${filter && filter !== c ? "dim" : ""}" data-cat="${esc(c)}"
       cx="90" cy="90" r="${R}" fill="none" stroke="${colorOf(c)}" stroke-width="26"
@@ -1142,13 +1951,16 @@ function renderDonut(cats, total) {
     filter = filter === el.dataset.cat ? null : el.dataset.cat; render();
   });
 }
+
 // ===== 消費趨勢 =====
 async function loadCycles(list) {
   const uid = user?.uid;
+  if (!uid) return;
   const missing = list.filter(c => !cycleCache[keyOf(c)]);
   if (!missing.length) return;
+  missing.sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
   const start = cycleRange(missing[0]).start, end = cycleRange(missing[missing.length - 1]).end;
-  const snap = await getDocs(query(collection(db, "users", user.uid, "transactions"),
+  const snap = await getDocs(query(collection(db, "users", uid, "transactions"),
     where("date", ">=", start), where("date", "<", end)));
   const fresh = {};
   missing.forEach(c => fresh[keyOf(c)] = []);
@@ -1168,14 +1980,14 @@ async function renderTrend() {
   for (let i = trendN - 1; i >= 0; i--) list.push(backCycles(ym, i));
   cycleCache[keyOf(ym)] = txs;                  // 本期用即時資料
   try { await loadCycles(list); } catch (e) { return; }
-  if (token !== trendToken) return;
+  if (token !== trendToken || searching) return;
   // 順便預先載入下一期和更早一期，按箭頭時就能馬上顯示
   const nextC = backCycles(ym, -1), olderC = backCycles(ym, trendN);
   const ahead = [olderC];
   if (nextC.y < CUR.y || (nextC.y === CUR.y && nextC.m <= CUR.m)) ahead.push(nextC);
   ahead.forEach(c => loadCycles([c]).catch(() => {}));
 
-  const pick = t => (!t.currency || t.currency === "TWD") && inRegion(t) && (!filter || (t.category || UNCAT) === filter);
+  const pick = t => isTwd(t) && inRegion(t) && (!filter || (t.category || UNCAT) === filter);
   const sumOf = arr => arr.filter(pick).reduce((s, t) => s + net(t), 0);
   const pts = list.map(c => ({ c, v: sumOf(cycleCache[keyOf(c)] || []) }));
   const hasData = pts.some(p => p.v > 0);
@@ -1205,7 +2017,7 @@ async function renderTrend() {
   if (filter || pts.length < 2) { $("movers").innerHTML = ""; return; }
   const catSum = (arrs) => {
     const m = {};
-    arrs.forEach(arr => arr.filter(t => (!t.currency || t.currency === "TWD") && inRegion(t))
+    arrs.forEach(arr => arr.filter(t => isTwd(t) && inRegion(t))
       .forEach(t => { const c = t.category || UNCAT; m[c] = (m[c] || 0) + net(t); }));
     return m;
   };
@@ -1230,7 +2042,7 @@ function drawTrend(pts) {
   const step = niceStep(max / 3);
   const top = Math.ceil(max / step) * step;
   const x = i => pts.length === 1 ? (L + W - R) / 2 : L + i * (W - L - R) / (pts.length - 1);
-  const y = v => T + (H - T - B) * (1 - v / top);
+  const y = v => T + (H - T - B) * (1 - Math.max(v, 0) / top);
   const avg = pts.reduce((a, p) => a + p.v, 0) / pts.length;
   const short = v => v >= 10000 ? (v / 10000).toFixed(v % 10000 ? 1 : 0).replace(/\.0$/, "") + "萬" : fmt(v);
 
@@ -1247,8 +2059,13 @@ function drawTrend(pts) {
   });
   const path = pts.map((p, i) => `${i ? "L" : "M"}${x(i)},${y(p.v)}`).join("");
   const area = `${path}L${x(pts.length - 1)},${y(0)}L${x(0)},${y(0)}Z`;
+  // 有設總預算時，畫一條預算線
+  const bud = +BUDGET.total || Object.values(BUDGET.cats || {}).reduce((s, v) => s + (+v || 0), 0);
+  const showBud = bud > 0 && !filter && !region && bud <= top;
   g += `<path class="area" d="${area}"/>
         <line class="avg" x1="${L}" x2="${W - R}" y1="${y(avg)}" y2="${y(avg)}"/>
+        ${showBud ? `<line x1="${L}" x2="${W - R}" y1="${y(bud)}" y2="${y(bud)}" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="2 4" opacity=".7"/>
+        <text class="avg-t" x="${W - R - 4}" y="${y(bud) - 6}" text-anchor="end" style="fill:var(--danger)">預算 ${fmt(bud)}</text>` : ""}
         <path class="line" d="${path}"/>
         <text class="avg-t" x="${L + 6}" y="${y(avg) - 6}">平均 ${fmt(avg)}</text>
         <line class="guide" id="trendGuide" y1="${T}" y2="${H - B}"/>`;
@@ -1276,7 +2093,7 @@ function drawTrend(pts) {
     r.addEventListener("mouseleave", () => { tip.style.opacity = 0; guide.style.opacity = 0; });
     r.addEventListener("click", () => {
       if (i === pts.length - 1) return show();
-      ym = { ...p.c }; filter = filter; subscribe();   // 跳到那一期，保留篩選
+      ym = { ...p.c }; subscribe();              // 跳到那一期，保留篩選
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   });
@@ -1306,7 +2123,7 @@ function drawMonthGrid() {
   $("mGrid").innerHTML = h;
   $("mGrid").querySelectorAll("button").forEach(b => b.onclick = () => {
     ym = { y: pickYear, m: +b.dataset.m };
-    filter = null; region = null;
+    filter = null; region = null; onlyPending = false;
     $("dlgMonth").close();
     subscribe();
   });
@@ -1314,7 +2131,7 @@ function drawMonthGrid() {
 $("monthLabel").onclick = () => { pickYear = ym.y; drawMonthGrid(); $("dlgMonth").showModal(); };
 $("yrPrev").onclick = () => { pickYear--; drawMonthGrid(); };
 $("yrNext").onclick = () => { pickYear++; drawMonthGrid(); };
-$("btnThisCycle").onclick = () => { ym = { ...CUR }; filter = null; region = null; $("dlgMonth").close(); subscribe(); };
+$("btnThisCycle").onclick = () => { ym = { ...CUR }; filter = null; region = null; onlyPending = false; $("dlgMonth").close(); subscribe(); };
 
 $("clearFilter").onclick = () => { filter = null; region = null; onlyPending = false; render(); };
 
@@ -1322,8 +2139,7 @@ $("clearFilter").onclick = () => { filter = null; region = null; onlyPending = f
 function openTx(t) {
   editingId = t?.id || null;
   $("txTitle").textContent = t ? "編輯消費" : "記一筆";
-  const today = new Date();
-  $("fDate").value = t?.date || `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  $("fDate").value = t?.date || ymd(new Date());
   $("fAmount").value = t?.amount ?? "";
   $("fStore").value = t?.store || "";
   fillCatSelect(t?.category);
@@ -1340,6 +2156,7 @@ function openTx(t) {
   if (t?.bankCategory) info.push("銀行分類：" + t.bankCategory);
   if (t?.card) info.push("卡號後 4 碼：" + t.card);
   if (t?.region) info.push("消費地區：" + t.region);
+  if (t && dupIds.has(t.id)) info.push("⚠ 同一天有一筆同店家、同金額的刷卡，請對一下帳單是否重複扣款");
   $("fInfo").textContent = info.join("，");
   $("fInfo").classList.toggle("hidden", !info.length);
   $("dlgTx").showModal();
@@ -1451,7 +2268,9 @@ $("btnDelete").onclick = async () => {
   const id = editingId;
   const old = (searching ? allTxs : txs).find(t => t.id === id) || txs.find(t => t.id === id);
   const { id: _omit, ...backup } = old || {};
-  await deleteDoc(doc(db, "users", user.uid, "transactions", id));
+  try {
+    await deleteDoc(doc(db, "users", user.uid, "transactions", id));
+  } catch (err) { return toast("刪除失敗：" + err.code); }
   $("dlgTx").close();
   cycleCache = {}; clearAn();
   if (searching) { allTxs = allTxs.filter(t => t.id !== id); renderSearch(); }
@@ -1485,6 +2304,7 @@ $("btnMenu").onclick = () => $("dlgMenu").showModal();
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => b.closest("dialog").close());
 // 點對話框外的灰色區域也能關閉
 document.querySelectorAll("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
+
 // ===== 管理分類 =====
 function catRow(name = "", color, orig = "") {
   const row = document.createElement("div");
@@ -1556,8 +2376,8 @@ $("btnCatSave").onclick = async () => {
   try {
     for (const r of renamed) await relabel(r.orig, r.name);
     for (const n of removed) await relabel(n, "");
-    // 店家規則跟著分類改名／刪除
     const renameMap = Object.fromEntries(renamed.map(r => [r.orig, r.name]));
+    // 店家規則跟著分類改名／刪除
     const nextRules = {};
     Object.entries(storeRules).forEach(([st, c]) => {
       if (removed.includes(c)) return;
@@ -1566,6 +2386,12 @@ $("btnCatSave").onclick = async () => {
     if (JSON.stringify(nextRules) !== JSON.stringify(storeRules)) {
       await setDoc(doc(db, "users", user.uid, "settings", "storeRules"),
         { list: Object.entries(nextRules).map(([st, c]) => ({ store: st, category: c })), updatedAt: serverTimestamp() });
+    }
+    // 分類預算也跟著改名／刪除
+    const oldCats = BUDGET.cats || {}, nextCats = {};
+    Object.entries(oldCats).forEach(([c, v]) => { if (!removed.includes(c)) nextCats[renameMap[c] || c] = v; });
+    if (JSON.stringify(nextCats) !== JSON.stringify(oldCats)) {
+      await updateDoc(doc(db, "users", user.uid, "settings", "budget"), { cats: nextCats, updatedAt: serverTimestamp() });
     }
     await setDoc(doc(db, "users", user.uid, "settings", "categories"),
       { list: rows.map(r => ({ name: r.name, color: r.color })), updatedAt: serverTimestamp() });
@@ -1618,7 +2444,7 @@ function toast(msg) {
   $("toast").textContent = msg;
   $("toast").classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => $("toast").classList.remove("show"), 1800);
+  toastTimer = setTimeout(() => $("toast").classList.remove("show"), 2200);
 }
 </script>
 </body>
