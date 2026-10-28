@@ -617,7 +617,7 @@
   </div>
   <div class="an-box">
     <p class="sec-title" style="margin:0">薪資與扣款</p>
-    <p class="cat-hint" style="margin:0">照薪資單填，網頁會自動算出實際拿到的錢。「% 投保」要填薪資單上的勞保、健保投保薪資，沒填就用本薪估算。資料只存在你自己的帳號。</p>
+    <p class="cat-hint" style="margin:0">照薪資單填，網頁會自動算出實際拿到的錢。「% 投保」的投保薪資沒填會照級距表自動推算，跟薪資單不同再自己填。資料只存在你自己的帳號。</p>
     <div class="row2">
       <div class="field"><label for="bGross">本薪（應發金額）</label><input class="num-in" type="number" id="bGross" inputmode="numeric" min="0" placeholder="0"></div>
       <div class="field"><label for="bOther">其他收入（選填）</label><input class="num-in" type="number" id="bOther" inputmode="numeric" min="0" placeholder="0"></div>
@@ -986,6 +986,16 @@ let dupIds = new Set();                       // 可能重複扣款的紀錄
 const EMPTY_BUDGET = { income: 0, save: 0, total: 0, cats: {}, notes: "", salary: null, periodVar: {} };
 // 台灣常見的薪資扣款，第一次打開預算規劃時先列出來，都可以改
 // 勞保：投保薪資 × 12.5%（含就業保險）× 自付 20% = 2.5%；健保：投保薪資 × 5.17% × 自付 30% = 1.551%
+// 投保薪資沒填時，照投保級距表找「大於等於本薪的最低一級」；勞保最高 45,800
+const INS_GRADES = [29500, 30300, 31800, 33300, 34800, 36300, 38200, 40100, 42000, 43900, 45800, 48200, 50600, 53000,
+  55400, 57800, 60800, 63800, 66800, 69800, 72800, 76500, 80200, 83900, 87600, 92100, 96600, 101100, 105600, 110100,
+  115500, 120900, 126300, 131700, 137100, 142500, 147900, 150000, 156400, 162800, 169200, 175600, 182000, 189500,
+  197000, 204500, 212000, 219500];
+function insBase(it, gross) {
+  if (+it.base > 0) return +it.base;
+  const g = INS_GRADES.find(x => x >= gross) || INS_GRADES[INS_GRADES.length - 1];
+  return /勞保/.test(it.name || "") ? Math.min(g, 45800) : g;
+}
 const DEFAULT_DEDS = [
   { name: "所得稅", mode: "pct", value: 5 },
   { name: "勞保費", mode: "ins", value: 2.5 },
@@ -996,7 +1006,7 @@ const DEFAULT_DEDS = [
 // 薪資扣款：固定金額、本薪的幾 %、或投保薪資的幾 %；「每期不同」的項目可以填每一期的預計金額
 function dedAmt(it, gross, cycleKey, periodVar) {
   const base = it.mode === "pct" ? Math.round(gross * (+it.value || 0) / 100)
-    : it.mode === "ins" ? Math.round((+it.base || gross) * (+it.value || 0) / 100)   // 投保薪資 × %，沒填投保薪資就用本薪估
+    : it.mode === "ins" ? Math.round(insBase(it, gross) * (+it.value || 0) / 100)   // 投保薪資 × %，沒填就照級距推算
     : (+it.value || 0);
   if (!it.variable) return base;
   const v = periodVar?.[cycleKey]?.[it.name];
@@ -1668,7 +1678,7 @@ function dedRow(it = {}, cur) {
       <input type="number" class="num-in d-val" inputmode="decimal" step="any" min="0" placeholder="0" value="${+it.value || ""}" aria-label="金額或百分比">
     </div>
     <div class="ded-bot">
-      <span class="cur d-insw ${it.mode === "ins" ? "" : "hidden"}">投保薪資<input type="number" class="num-in d-base" inputmode="numeric" min="0" placeholder="同本薪" value="${+it.base || ""}" aria-label="投保薪資"></span>
+      <span class="cur d-insw ${it.mode === "ins" ? "" : "hidden"}">投保薪資<input type="number" class="num-in d-base" inputmode="numeric" min="0" placeholder="自動" value="${+it.base || ""}" aria-label="投保薪資"></span>
       <label class="check-inline"><input type="checkbox" class="d-var" ${it.variable ? "checked" : ""}>每期金額不一樣</label>
       <span class="cur ${it.variable ? "" : "hidden"}">${CUR.m} 月帳單預計<input type="number" class="num-in d-cur" inputmode="numeric" min="0" placeholder="同上" value="${cur ?? ""}" aria-label="本期預計金額"></span>
       <span class="ded-amt d-show"></span>
@@ -1703,6 +1713,7 @@ function salaryNet() {
     const a = it ? dedAmt(it, sal.gross, k, pv) : 0;
     ded += a;
     r.querySelector(".d-show").textContent = it && it.mode !== "amt" && a ? `＝ ${fmt(a)} 元` : "";
+    if (it && it.mode === "ins") r.querySelector(".d-base").placeholder = sal.gross ? `自動 ${fmt(insBase({ ...it, base: 0 }, sal.gross))}` : "自動";
   });
   return { sal, ded, net: sal.gross - ded + sal.other };
 }
