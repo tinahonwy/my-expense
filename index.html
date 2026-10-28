@@ -468,7 +468,20 @@
   .field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .link-btn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 13px; font-weight: 500; }
   .field small { font-size: 12px; color: var(--muted); }
-  .menu-list button { text-align: left; }
+  .menu-list button { text-align: left; display: flex; align-items: center; gap: 12px; }
+  .menu-list .mi { width: 22px; height: 22px; flex: none; color: var(--accent); }
+  .menu-list .btn-cancel .mi { color: var(--danger); }
+  /* 總覽裡的預算進度 */
+  .bud-mini { display: block; width: 100%; margin-top: 14px; padding: 12px 14px; border: 0; border-radius: 12px; background: var(--bg); text-align: left; }
+  .bud-mini:hover { background: var(--accent-soft); }
+  .bud-mini .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--muted); }
+  .bud-mini .row b { font-family: var(--num); font-size: 20px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .bud-mini .row b.over { color: var(--danger); }
+  .bud-mini .prog { margin: 8px 0 6px; height: 8px; background: var(--paper); }
+  .bud-mini .sub3 { font-size: 12px; color: var(--muted); }
+  .bud-mini .sub3 .warn { color: var(--danger); }
+  .bar-bud { display: block; font-size: 11px; color: var(--muted); text-align: right; font-family: var(--text); font-weight: 400; }
+  .bar-bud.over { color: var(--danger); }
   .menu-list .btn-cancel { margin-top: 6px; }
 
   .toast {
@@ -541,6 +554,7 @@
     <div class="receipt-label">本期我實際花的</div>
     <div class="total"><small>NT$</small><span id="total">0</span></div>
     <div class="meta" id="meta"></div>
+    <button class="bud-mini hidden" id="budMini" aria-label="查看本期預算"></button>
     <div class="bill-row hidden" id="billRow"></div>
     <div class="pending-who hidden" id="pendingWho"></div>
     <div class="split hidden" id="split"></div>
@@ -784,16 +798,16 @@
   <div class="dlg">
     <div class="dlg-head"><h3 id="menuName"></h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <div class="menu-list">
-      <button class="btn-ghost" id="btnBudget">預算規劃</button>
-      <button class="btn-ghost" id="btnStocks">股票投資</button>
-      <button class="btn-ghost" id="btnSubs">固定支出／訂閱</button>
-      <button class="btn-ghost" id="btnAnalysis">消費分析（店家排行）</button>
+      <button class="btn-ghost" id="btnBudget"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>預算規劃</button>
+      <button class="btn-ghost" id="btnStocks"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg>股票投資</button>
+      <button class="btn-ghost" id="btnSubs"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/></svg>固定支出／訂閱</button>
+      <button class="btn-ghost" id="btnAnalysis"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>消費分析（店家排行）</button>
       <div class="menu-sep"></div>
-      <button class="btn-ghost" id="btnCycle">帳單結帳日</button>
-      <button class="btn-ghost" id="btnCats">管理分類</button>
-      <button class="btn-ghost" id="btnKey">刷卡自動匯入</button>
-      <button class="btn-ghost" id="btnExport">匯出本期 CSV（Excel 可開）</button>
-      <button class="btn-cancel" id="btnLogout">登出</button>
+      <button class="btn-ghost" id="btnCycle"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>帳單結帳日</button>
+      <button class="btn-ghost" id="btnCats"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.6V4.5a1 1 0 0 1 1-1h8.1l8 8a1.5 1.5 0 0 1 0 2.1l-6 6a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>管理分類</button>
+      <button class="btn-ghost" id="btnKey"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.5 7l8.5 6 8.5-6"/></svg>刷卡自動匯入</button>
+      <button class="btn-ghost" id="btnExport"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M4.5 19.5h15"/></svg>匯出本期 CSV（Excel 可開）</button>
+      <button class="btn-cancel" id="btnLogout"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14"/><path d="M10 16l4-4-4-4M14 12H4"/></svg>登出</button>
     </div>
   </div>
 </dialog>
@@ -1237,7 +1251,8 @@ function render() {
     <button class="bar ${filter && filter !== c ? "dim" : ""}" data-cat="${esc(c)}">
       <span class="bar-name">${esc(c)}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${(Math.max(v, 0) / max * 100).toFixed(1)}%;background:${colorOf(c)}"></span></span>
-      <span class="bar-amt">${fmt(v)}<span class="bar-pct">${chartTotal ? Math.round(v / chartTotal * 100) : 0}%</span></span>
+      <span class="bar-amt">${fmt(v)}<span class="bar-pct">${chartTotal ? Math.round(v / chartTotal * 100) : 0}%</span>${+BUDGET.cats?.[c] > 0 && !region
+        ? `<span class="bar-bud ${v > +BUDGET.cats[c] ? "over" : ""}">預算 ${fmt(BUDGET.cats[c])}${v > +BUDGET.cats[c] ? `，超支 ${fmt(v - BUDGET.cats[c])}` : `，剩 ${fmt(BUDGET.cats[c] - v)}`}</span>` : ""}</span>
     </button>`).join("");
   $("bars").querySelectorAll(".bar").forEach(b => b.onclick = () => {
     filter = filter === b.dataset.cat ? null : b.dataset.cat; render();
@@ -1271,6 +1286,7 @@ function renderBudget(twd) {
   const totalB = +BUDGET.total || catB.reduce((s, [, v]) => s + +v, 0);
   const income = incomeFor(ym), saveGoal = +BUDGET.save || 0;
   const hasSalary = BUDGET.salary && +BUDGET.salary.gross > 0;
+  $("budMini").classList.add("hidden");
   if (!totalB && !income) {
     el.innerHTML = `<div class="card-head"><h3>預算</h3></div>
       <p class="bud-sub" style="margin:6px 0 12px">設定每月預算後，這裡會顯示本期還能花多少、每天可以花多少，以及照目前速度會不會超支。</p>
@@ -1295,6 +1311,14 @@ function renderBudget(twd) {
       <div class="bud-sub">已花 <b>${fmt(spent)}</b> ／ 預算 <b>${fmt(totalB)}</b>（${Math.round(pct)}%）</div>
       <div class="prog"><span class="${remain < 0 ? "over" : ""}" style="width:${Math.min(Math.max(pct, 0), 100).toFixed(1)}%"></span>${isCurrent ? `<i style="left:${(elapsed / days * 100).toFixed(1)}%" title="今天"></i>` : ""}</div>`;
     if (isCurrent && remain > 0) lines.push(`還有 ${leftDays} 天，平均每天可以花 <b>${fmt(remain / leftDays)}</b>`);
+    // 首頁最上面的總覽也放一條預算進度，點了捲到下方的預算卡片
+    const mini = $("budMini");
+    mini.classList.remove("hidden");
+    mini.innerHTML = `
+      <div class="row"><span>${remain < 0 ? "本期預算已超支" : isCurrent ? "本期預算還可以花" : "本期預算結餘"}</span><b class="${remain < 0 ? "over" : ""}">${fmt(Math.abs(remain))}</b></div>
+      <div class="prog"><span class="${remain < 0 ? "over" : ""}" style="width:${Math.min(Math.max(pct, 0), 100).toFixed(1)}%"></span>${isCurrent ? `<i style="left:${(elapsed / days * 100).toFixed(1)}%"></i>` : ""}</div>
+      <div class="sub3">${fmt(spent)} ／ ${fmt(totalB)}${isCurrent && remain > 0 ? `・還有 ${leftDays} 天，每天 ${fmt(remain / leftDays)}` : ""}${proj !== null && proj > totalB ? `・<span class="warn">照目前速度會超支 ${fmt(proj - totalB)}</span>` : ""}</div>`;
+    mini.onclick = () => el.scrollIntoView({ behavior: "smooth", block: "start" });
     if (proj !== null) lines.push(proj > totalB
       ? `<span class="warn">照目前速度，本期預估花 <b>${fmt(proj)}</b>，會超支 <b>${fmt(proj - totalB)}</b></span>`
       : `照目前速度，本期預估花 <b>${fmt(proj)}</b>，在預算內`);
