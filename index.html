@@ -2302,8 +2302,9 @@ $("btnUndo").onclick = async () => {
 // ===== 選單 =====
 $("btnMenu").onclick = () => $("dlgMenu").showModal();
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => b.closest("dialog").close());
-// 點對話框外的灰色區域也能關閉
-document.querySelectorAll("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
+// 點對話框外的灰色區域不會關閉，要按「取消」或右上角的 ✕，避免填到一半不小心關掉
+// 只有選單和選擇帳單期這兩個不用填資料的視窗，點外面可以關閉
+["dlgMenu", "dlgMonth"].forEach(id => $(id).addEventListener("click", e => { if (e.target === $(id)) $(id).close(); }));
 
 // ===== 管理分類 =====
 function catRow(name = "", color, orig = "") {
