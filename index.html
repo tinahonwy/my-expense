@@ -276,6 +276,26 @@
   .edit-btn { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); }
   .edit-btn svg { width: 13px; height: 13px; }
   .pick-box { display: grid; gap: 6px; }
+  dialog.wide { width: min(760px, calc(100% - 24px)); }
+  .k-info { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); min-height: 40px; }
+  .k-info b { font-family: var(--num); font-size: 16px; font-weight: 600; color: var(--ink); margin-left: 3px; font-variant-numeric: tabular-nums; }
+  .k-info .k-date { color: var(--ink); font-weight: 700; flex-basis: 100%; }
+  .k-chart { position: relative; touch-action: pan-y; }
+  .k-chart svg { display: block; width: 100%; height: 320px; }
+  .k-chart .grid { stroke: var(--line); stroke-width: 1; }
+  .k-chart .axis-t { font: 11px var(--num); fill: var(--muted); }
+  .k-chart .up { fill: var(--up); stroke: var(--up); }
+  .k-chart .down { fill: var(--down); stroke: var(--down); }
+  .k-chart .vup { fill: var(--up); opacity: .35; }
+  .k-chart .vdown { fill: var(--down); opacity: .35; }
+  .k-chart .ma5 { fill: none; stroke: #E0A11E; stroke-width: 1.4; }
+  .k-chart .ma20 { fill: none; stroke: #4F86C6; stroke-width: 1.4; }
+  .k-chart .cost { stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 5 4; }
+  .k-chart .cost-t { font: 600 11px var(--text); fill: var(--accent); paint-order: stroke; stroke: var(--paper); stroke-width: 4px; }
+  .k-chart .cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  .k-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+  .k-legend i { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 4px; }
+  .k-msg { display: grid; place-items: center; height: 320px; color: var(--muted); font-size: 14px; text-align: center; }
   .pick-box > span { font-size: 13px; color: var(--muted); }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chips button {
@@ -400,7 +420,7 @@
   }
   /* 手機：對話框從底部滑出 */
   @media (max-width: 520px) {
-    dialog { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 22px 22px 0 0; max-height: 92vh; }
+    dialog, dialog.wide { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 22px 22px 0 0; max-height: 92vh; }
     dialog[open] { animation: sheet .24s ease-out; }
     @keyframes sheet { from { transform: translateY(100%); } }
     .dlg { padding: 22px 20px calc(22px + env(safe-area-inset-bottom, 0px)); }
@@ -702,6 +722,22 @@
   </form>
 </dialog>
 
+<dialog id="dlgKline" class="wide">
+  <div class="dlg">
+    <div class="dlg-head"><h3 id="kTitle">K 線</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+    <div class="seg seg-full" id="kRange">
+      <button type="button" data-r="1mo">1 個月</button><button type="button" data-r="3mo">3 個月</button><button type="button" data-r="6mo">6 個月</button><button type="button" data-r="1y">1 年</button><button type="button" data-r="2y">2 年</button>
+    </div>
+    <div class="k-info" id="kInfo"></div>
+    <div class="k-chart" id="kChart"><svg id="kSvg" role="img" aria-label="K 線圖"></svg></div>
+    <div class="k-legend">
+      <span><i style="background:#E0A11E"></i>5 日均線</span><span><i style="background:#4F86C6"></i>20 日均線</span>
+      <span><i style="background:var(--accent)"></i>我的均價</span><span><b class="up">▲</b> 我買進　<b class="down">▼</b> 我賣出</span>
+    </div>
+    <p class="cat-hint" style="margin:0">紅色代表收盤比開盤高、綠色代表比開盤低。手指在圖上滑動可以看每一天的價格。2 年是週 K。</p>
+  </div>
+</dialog>
+
 <dialog id="dlgPrice">
   <form class="dlg" method="dialog" id="prForm">
     <div class="dlg-head"><h3 id="prTitle">更新現價</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
@@ -830,7 +866,7 @@ const IMPORT_SERVICE_URL = "https://script.google.com/macros/s/AKfycbziYRsVgjpKl
 
 // 台股即時股價服務的網址（把 price-proxy.gs 部署成網頁應用程式後，把結尾是 /exec 的網址貼在引號裡）
 // 留空的話，股票頁會改用你手動填的現價
-const PRICE_API_URL = "https://script.google.com/macros/s/AKfycbwENDt-whUcI3CPiOzooL-EKySIQSXtD7xTJKRPzyTyGs3of7G6KqwaQs8VaPHjls1Ulg/exec";
+const PRICE_API_URL = "https://script.google.com/macros/s/AKfycbzj3V3Phc_F2ASRNvJeej0V9ixaPHPX7oqB9B1_IDdFFabnInkxY4Mx-Y_ysw2VauQrQQ/exec";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -1742,12 +1778,14 @@ function renderStocks() {
       <div class="hold-act">
         <button type="button" class="act-buy" data-act="buy">＋ 加碼買進</button>
         <button type="button" class="act-sell" data-act="sell">賣出</button>
+        <button type="button" data-act="kline">K 線</button>
         <button type="button" class="act-price" data-act="price">手動填現價</button>
       </div>
     </div>`).join("") : `<div class="empty" style="padding:24px">目前沒有持股</div>`;
   $("stHold").querySelectorAll(".hold").forEach(row => row.querySelectorAll("button").forEach(b => b.onclick = () => {
     const code = row.dataset.code;
     if (b.dataset.act === "price") openPrice(code);
+    else if (b.dataset.act === "kline") openKline(code);
     else openStockTx(null, { code, type: b.dataset.act });
   }));
 
@@ -1951,6 +1989,133 @@ $("btnStDelete").onclick = async () => {
     if (old) showUndo(`已刪除「${old.name || old.code}」交易`, () => setDoc(doc(db, "users", user.uid, "stocks", id), backup).then(() => toast("已復原")));
   } catch (err) { toast("刪除失敗：" + err.code); }
 };
+
+// ===== K 線 =====
+let kCode = null, kRange = "6mo", kBars = [], kToken = 0;
+const kCache = {};
+let kSel = -1;
+try { kRange = localStorage.getItem("kRange") || "6mo"; } catch (e) {}
+function openKline(code) {
+  kCode = code;
+  const h = calcHoldings().H[code];
+  $("kTitle").textContent = `${h?.name || quotes[code]?.name || code} ${code}`;
+  $("dlgKline").showModal();
+  loadKline();
+}
+$("kRange").querySelectorAll("button").forEach(b => b.onclick = () => {
+  kRange = b.dataset.r;
+  try { localStorage.setItem("kRange", kRange); } catch (e) {}
+  loadKline();
+});
+async function loadKline() {
+  $("kRange").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.r === kRange));
+  const key = kCode + "_" + kRange, token = ++kToken;
+  if (!PRICE_API_URL) { $("kInfo").innerHTML = ""; $("kChart").innerHTML = `<div class="k-msg">要先設定股價服務才能看 K 線</div>`; return; }
+  if (!kCache[key]) {
+    $("kInfo").innerHTML = "";
+    $("kChart").innerHTML = `<div class="k-msg">載入中…</div>`;
+    try {
+      const r = await fetch(`${PRICE_API_URL}?kline=${encodeURIComponent(kCode)}&range=${kRange}`);
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "讀取失敗");
+      kCache[key] = j.bars;
+    } catch (e) {
+      if (token === kToken) $("kChart").innerHTML = `<div class="k-msg">K 線讀取失敗：${esc(e.message || e)}<br>如果股價服務是舊版，要把新的 price-proxy.gs 部署成新版本</div>`;
+      return;
+    }
+  }
+  if (token !== kToken) return;
+  kBars = kCache[key];
+  $("kChart").innerHTML = `<svg id="kSvg" role="img" aria-label="K 線圖"></svg>`;
+  kSel = -1;
+  drawKline();
+}
+const ma = (bars, n) => bars.map((_, i) => i < n - 1 ? null : bars.slice(i - n + 1, i + 1).reduce((s, b) => s + b.c, 0) / n);
+function drawKline() {
+  const svg = $("kSvg");
+  if (!svg || !kBars.length) return;
+  const W = svg.clientWidth || 600, H = 320;
+  const L = 6, R = 52, T = 12, PH = 220, VT = PH + 28, VH = H - VT - 18;
+  const n = kBars.length, step = (W - L - R) / n, cw = Math.max(1, Math.min(step * 0.7, 12));
+  const m5 = ma(kBars, 5), m20 = ma(kBars, 20);
+  const h = calcHoldings().H[kCode];
+  const avg = h && h.shares ? h.cost / h.shares : null;
+  let lo = Math.min(...kBars.map(b => b.l)), hi = Math.max(...kBars.map(b => b.h));
+  if (avg && avg > lo * 0.85 && avg < hi * 1.15) { lo = Math.min(lo, avg); hi = Math.max(hi, avg); }
+  const pad = (hi - lo) * 0.06 || hi * 0.02;
+  lo -= pad; hi += pad;
+  const y = v => T + (hi - v) / (hi - lo) * PH;
+  const x = i => L + step * (i + 0.5);
+  const vmax = Math.max(...kBars.map(b => b.v)) || 1;
+  const vy = v => VT + VH - v / vmax * VH;
+  let g = "";
+  // 價格格線
+  const st = niceStep((hi - lo) / 4);
+  for (let v = Math.ceil(lo / st) * st; v <= hi; v += st) {
+    g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="axis-t" x="${W - R + 6}" y="${y(v) + 4}">${fmtP(+v.toFixed(2))}</text>`;
+  }
+  // 日期
+  const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((W - L - R) / 70))));
+  for (let i = n - 1; i >= 0; i -= every) {
+    const d = kBars[i].d;
+    g += `<text class="axis-t" x="${x(i)}" y="${H - 4}" text-anchor="middle">${+d.slice(5, 7)}/${+d.slice(8)}</text>`;
+  }
+  g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${VT + VH}" y2="${VT + VH}"/>`;
+  // 成交量和 K 棒
+  kBars.forEach((b, i) => {
+    const up = b.c >= b.o, cls = up ? "up" : "down";
+    g += `<rect class="${up ? "vup" : "vdown"}" x="${x(i) - cw / 2}" y="${vy(b.v)}" width="${cw}" height="${VT + VH - vy(b.v)}"/>`;
+    g += `<line class="${cls}" x1="${x(i)}" x2="${x(i)}" y1="${y(b.h)}" y2="${y(b.l)}" stroke-width="1"/>`;
+    const top = y(Math.max(b.o, b.c)), bh = Math.max(Math.abs(y(b.o) - y(b.c)), 1);
+    g += `<rect class="${cls}" x="${x(i) - cw / 2}" y="${top}" width="${cw}" height="${bh}"/>`;
+  });
+  const line = arr => arr.map((v, i) => v === null ? "" : `${arr[i - 1] == null ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  g += `<path class="ma5" d="${line(m5)}"/><path class="ma20" d="${line(m20)}"/>`;
+  // 我的均價
+  if (avg && avg >= lo && avg <= hi) {
+    g += `<line class="cost" x1="${L}" x2="${W - R}" y1="${y(avg)}" y2="${y(avg)}"/>
+      <text class="cost-t" x="${L + 4}" y="${y(avg) - 5}">我的均價 ${fmtP(+avg.toFixed(2))}</text>`;
+  }
+  // 我的買賣點：對到當天或之後最近的一根 K 棒
+  stockTxs.filter(t => String(t.code).toUpperCase() === kCode && (t.type === "buy" || t.type === "sell")).forEach(t => {
+    const i = kBars.findIndex(b => b.d >= t.date);
+    if (i < 0 || t.date < kBars[0].d) return;
+    const b = kBars[i];
+    g += t.type === "buy"
+      ? `<path class="up" d="M${x(i)},${y(b.l) + 4} l-5,9 h10 z"><title>${t.date} 買進 ${fmtP(t.shares)} 股 @ ${fmtP(t.price)}</title></path>`
+      : `<path class="down" d="M${x(i)},${y(b.h) - 4} l-5,-9 h10 z"><title>${t.date} 賣出 ${fmtP(t.shares)} 股 @ ${fmtP(t.price)}</title></path>`;
+  });
+  g += `<g id="kCross" style="display:none"><line class="cross" id="kCx" y1="${T}" y2="${VT + VH}"/></g>
+    <rect id="kHit" x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent"/>`;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = g;
+  const pick = ev => {
+    const rect = svg.getBoundingClientRect();
+    const px = (ev.clientX - rect.left) * W / rect.width;
+    kSel = Math.min(n - 1, Math.max(0, Math.floor((px - L) / step)));
+    $("kCross").style.display = "";
+    $("kCx").setAttribute("x1", x(kSel)); $("kCx").setAttribute("x2", x(kSel));
+    kInfo(kSel, m5, m20);
+  };
+  const hit = $("kHit");
+  hit.addEventListener("pointerdown", pick);
+  hit.addEventListener("pointermove", ev => { if (ev.pointerType === "mouse" || ev.buttons) pick(ev); });
+  hit.addEventListener("pointerleave", ev => { if (ev.pointerType === "mouse") { $("kCross").style.display = "none"; kInfo(n - 1, m5, m20); } });
+  kInfo(n - 1, m5, m20);
+}
+function kInfo(i, m5, m20) {
+  const b = kBars[i], prev = kBars[i - 1];
+  const d = prev ? b.c - prev.c : null;
+  const dt = new Date(b.d + "T00:00:00");
+  $("kInfo").innerHTML = `
+    <span class="k-date">${b.d.replaceAll("-", "/")}（${WEEK[dt.getDay()]}）${kRange === "2y" ? " 那一週" : ""}</span>
+    <span>開<b>${fmtP(b.o)}</b></span><span>高<b>${fmtP(b.h)}</b></span><span>低<b>${fmtP(b.l)}</b></span>
+    <span>收<b class="${d === null ? "" : upDown(d * 1000)}">${fmtP(b.c)}</b>${d !== null ? ` <span class="${upDown(d * 1000)}">${chg(+d.toFixed(2))}（${pctTxt(d / prev.c * 100)}）</span>` : ""}</span>
+    <span>量<b>${fmt(b.v)}</b> 張</span>
+    ${m5[i] !== null ? `<span style="color:#E0A11E">MA5<b>${fmtP(+m5[i].toFixed(2))}</b></span>` : ""}
+    ${m20[i] !== null ? `<span style="color:#4F86C6">MA20<b>${fmtP(+m20[i].toFixed(2))}</b></span>` : ""}`;
+}
+window.addEventListener("resize", () => { if ($("dlgKline").open) drawKline(); });
 
 function openPrice(code) {
   priceCode = code;
