@@ -866,7 +866,7 @@
 <dialog id="dlgBase">
   <form class="dlg" method="dialog" id="baseForm">
     <div class="dlg-head"><h3>更新存款</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
-    <p class="cat-hint" style="margin:0">打開銀行 App，照現在的數字填。之後網頁會從這一天開始自動算：每月 1 號加上薪水，扣掉固定支出和你記到的消費。數字跟銀行對不上時，再來這裡更新一次就好。</p>
+    <p class="cat-hint" style="margin:0">打開銀行 App，照現在的數字填。之後網頁會從這一天開始自動算：每月 1 號加上薪水，扣掉固定支出和你記到的支出，別人還你錢時再加回來。數字跟銀行對不上時，再來這裡更新一次就好。</p>
     <div class="row2">
       <div class="field"><label for="aDate">日期</label><input type="date" id="aDate" required></div>
       <div class="field"><label for="aBank">銀行存款合計</label><input class="num-in" type="number" id="aBank" inputmode="numeric" placeholder="0" required></div>
@@ -876,12 +876,8 @@
       <input class="num-in" type="number" id="aCard" inputmode="numeric" min="0" placeholder="0（已經繳了就填 0）">
       <small id="aCardHint"></small>
     </div>
-    <div class="field">
-      <label for="aRecv">公司（或別人）還沒還我的錢</label>
-      <input class="num-in" type="number" id="aRecv" inputmode="numeric" min="0" placeholder="0">
-      <small>例如先幫公司墊的錢。拿到之後，下次更新存款時改回 0。</small>
-    </div>
     <div class="info" id="aUnbilled"></div>
+    <div class="info">公司或別人欠你的錢不用填這裡。在記帳那筆消費的「別人分攤」填金額、勾「還沒收到」，網頁會自動算；收到錢後把勾勾取消就好。</div>
     <div class="dlg-actions">
       <button type="button" class="btn-cancel" id="btnBaseCancel">取消</button>
       <button type="submit" class="btn-primary" id="btnBaseSave">儲存</button>
@@ -1851,11 +1847,35 @@ async function renderAssets() {
   const twd = data.filter(isTwd);
   // 起點那天，這一期已經刷了、還沒出帳的卡費
   const unbilled = twd.filter(t => t.source === "gmail" && t.date >= curStart && t.date <= base.date).reduce((s, t) => s + (+t.amount || 0), 0);
-  const spentAfter = twd.filter(t => t.date > base.date && t.date <= today).reduce((s, t) => s + net(t), 0);
+  // 起點之後的支出照全額扣（刷卡要全額繳），別人還的錢收到才加回來
+  const spentAfter = twd.filter(t => t.date > base.date && t.date <= today).reduce((s, t) => s + (+t.amount || 0), 0);
+  // 別人欠我的：記帳裡勾「還沒收到」的；已收到的：收到日在起點之後就加回現金
+  let pendList = [], recvExtra = [];
+  try {
+    const col = collection(db, "users", user.uid, "transactions");
+    const [a, b] = await Promise.all([
+      getDocs(query(col, where("backPending", "==", true))),
+      getDocs(query(col, where("backReceivedAt", ">", base.date))),
+    ]);
+    pendList = a.docs.map(d => ({ id: d.id, ...d.data() }));
+    recvExtra = b.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {}
+  if (token !== assetsToken) return;
+  const pend = pendList.filter(t => isTwd(t) && t.backPending && +t.paidBack > 0);
+  const recv = pend.reduce((s, t) => s + (+t.paidBack || 0), 0);
+  const byWho = {};
+  pend.forEach(t => { const k = t.paidBy || "別人"; byWho[k] = (byWho[k] || 0) + (+t.paidBack || 0); });
+  const seen = new Set();
+  const backIn = [...twd, ...recvExtra].filter(t => {
+    if (seen.has(t.id)) return false;
+    seen.add(t.id);
+    const at = t.backReceivedAt || t.date;
+    return isTwd(t) && !t.backPending && +t.paidBack > 0 && at > base.date && at <= today;
+  }).reduce((s, t) => s + (+t.paidBack || 0), 0);
   const firsts = firstsBetween(base.date, today);
   const sal = firsts.map(f => ({ ...f, v: salaryOf(f.y, f.m), fx: fixedFor(cycleOf(f.y, f.m, 1)) }));
   const salSum = sal.reduce((s, x) => s + x.v, 0), fixSum = sal.reduce((s, x) => s + x.fx, 0);
-  const bank = +base.bank || 0, card = +base.card || 0, recv = +base.recv || 0;
+  const bank = +base.bank || 0, card = +base.card || 0;
   // 起點之後的股票交易：買進扣現金（含手續費）、賣出拿回現金（扣手續費和證交稅）、現金股利加回
   let stBuy = 0, stSell = 0, stDiv = 0;
   stockTxs.filter(t => t.date > base.date && t.date <= today).forEach(t => {
@@ -1864,9 +1884,13 @@ async function renderAssets() {
     else if (t.type === "sell") stSell += sh * pr - fee - tax;
     else if (t.type === "div") stDiv += +t.amount || 0;
   });
-  const cash = bank + recv - card - unbilled + salSum - fixSum - spentAfter - stBuy + stSell + stDiv;
+  // 能用的現金：不含別人還沒還的錢（還沒回到帳戶，不能拿來繳卡費）
+  const cash = bank - card - unbilled + salSum - fixSum - spentAfter + backIn - stBuy + stSell + stDiv;
   const st = stockValue();
-  const total = cash + st.v;
+  const total = cash + recv + st.v;
+  // 下一次發薪後的現金（只算薪水和固定支出）
+  const nt = new Date(), ny = nt.getMonth() === 11 ? nt.getFullYear() + 1 : nt.getFullYear(), nm = nt.getMonth() === 11 ? 1 : nt.getMonth() + 2;
+  const afterPay = cash + salaryOf(ny, nm) - fixedFor(cycleOf(ny, nm, 1));
   const bd = base.date.slice(5).replace("-", "/").replace(/^0/, "");
   $("asSum").innerHTML = `
     <div>
@@ -1874,25 +1898,30 @@ async function renderAssets() {
       <div class="as-big ${total < 0 ? "neg" : ""}"><small>NT$</small>${fmt(total)}</div>
       <div class="an-meta">從 ${bd} 你輸入的存款開始算${st.n ? "，含股票市值" : ""}</div>
     </div>
-    <div class="as-grid">
-      <div>現金（扣掉卡費後）<b class="${cash < 0 ? "neg" : ""}">${fmt(cash)}</b><small>真正能用的錢</small></div>
+    <div class="as-grid" style="grid-template-columns:repeat(${recv ? 3 : 2},1fr)">
+      <div>能用的現金<b class="${cash < 0 ? "neg" : ""}">${fmt(cash)}</b><small>已扣掉要繳的卡費</small></div>
+      ${recv ? `<div>等別人還的錢<b>${fmt(recv)}</b><small>${Object.entries(byWho).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${esc(k)} ${fmt(v)}`).join("、")}</small></div>` : ""}
       <div>股票市值<b>${st.n ? fmt(st.v) : "—"}</b><small>${st.n ? (st.priced ? `${st.n} 檔` : "部分用成本估") : "還沒有股票紀錄"}</small></div>
-    </div>`;
+    </div>
+    ${cash < 0 ? `<div class="prog-explain" style="margin:0"><span class="warn">現在帳戶的錢不夠繳完卡費，還差 <b>${fmt(-cash)}</b>。</span>
+      ${nm}/1 薪水入帳後，能用的現金會變成大約 <b>${fmt(afterPay)}</b>${afterPay >= 0 ? "，就夠繳了" : "，還是不夠，要等別人還錢"}。記得確認繳款截止日在發薪之後。</div>` : ""}`;
   const ln = (label, v, cls = "") => `<div class="ln ${cls}"><span>${label}</span><b>${v < 0 ? "−" : cls === "plus" ? "＋" : ""}${fmt(Math.abs(v))}</b></div>`;
   const rows = [ln(`${bd} 銀行存款`, bank)];
-  if (recv) rows.push(ln("別人還沒還我的錢", recv, "plus"));
   if (card) rows.push(ln("已出帳、還沒繳的卡費", -card, "minus"));
   if (unbilled) rows.push(ln(`本期到 ${bd} 已刷、還沒出帳`, -unbilled, "minus"));
   sal.forEach(x => {
     rows.push(ln(`${x.m}/1 薪水`, x.v, "plus"));
     if (x.fx) rows.push(ln(`${x.m}/1 固定支出（${fixedNames().map(esc).join("、")}）`, -x.fx, "minus"));
   });
-  rows.push(ln(`${bd} 之後記到的消費`, -spentAfter, "minus"));
+  rows.push(ln(`${bd} 之後的支出（刷卡照全額）`, -spentAfter, "minus"));
+  if (backIn) rows.push(ln(`${bd} 之後別人還我的錢（已收到）`, backIn, "plus"));
   if (stBuy) rows.push(ln(`${bd} 之後買股票（含手續費）`, -stBuy, "minus"));
   if (stSell) rows.push(ln(`${bd} 之後賣股票拿回`, stSell, "plus"));
   if (stDiv) rows.push(ln(`${bd} 之後領到的現金股利`, stDiv, "plus"));
-  rows.push(ln("現金合計", cash, "tot"));
-  if (st.n) { rows.push(ln("股票市值", st.v, "plus")); rows.push(ln("總資產", total, "tot")); }
+  rows.push(ln("能用的現金", cash, "tot"));
+  if (recv) rows.push(ln("等別人還的錢（記帳裡勾「還沒收到」）", recv, "plus"));
+  if (st.n) rows.push(ln("股票市值", st.v, "plus"));
+  if (recv || st.n) rows.push(ln("總資產", total, "tot"));
   $("asCalc").innerHTML = rows.join("");
 }
 
@@ -1954,7 +1983,6 @@ async function openBase() {
   $("aDate").value = ymd(new Date());
   $("aBank").value = b.bank ?? "";
   $("aCard").value = "";
-  $("aRecv").value = b.recv || "";
   $("aCardHint").textContent = "";
   $("aUnbilled").textContent = "";
   $("dlgBase").showModal();
@@ -1980,7 +2008,7 @@ $("btnBase").onclick = openBase;
 $("btnBaseCancel").onclick = () => $("dlgBase").close();
 $("baseForm").onsubmit = async e => {
   e.preventDefault();
-  const base = { date: $("aDate").value, bank: +$("aBank").value || 0, card: +$("aCard").value || 0, recv: +$("aRecv").value || 0 };
+  const base = { date: $("aDate").value, bank: +$("aBank").value || 0, card: +$("aCard").value || 0 };
   if (!base.date || $("aBank").value === "") return toast("請填日期和存款");
   $("btnBaseSave").disabled = true;
   try {
@@ -3046,6 +3074,11 @@ $("txForm").onsubmit = async e => {
   };
   if (!data.date || isNaN(data.amount)) return;
   if (data.paidBack > data.amount) return toast("分攤金額不能大於消費金額");
+  // 記下「別人還錢」是哪一天收到的（資產總覽用來算現金）
+  const oldTx = editingId ? [...(allTxs || []), ...txs].find(t => t.id === editingId) : null;
+  if (data.backPending || !data.paidBack) data.backReceivedAt = "";
+  else if (oldTx?.backPending) data.backReceivedAt = ymd(new Date());
+  else if (oldTx?.backReceivedAt) data.backReceivedAt = oldTx.backReceivedAt;
   $("btnSave").disabled = true;
   try {
     const col = collection(db, "users", user.uid, "transactions");
