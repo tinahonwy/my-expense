@@ -830,7 +830,7 @@ const IMPORT_SERVICE_URL = "https://script.google.com/macros/s/AKfycbziYRsVgjpKl
 
 // 台股即時股價服務的網址（把 price-proxy.gs 部署成網頁應用程式後，把結尾是 /exec 的網址貼在引號裡）
 // 留空的話，股票頁會改用你手動填的現價
-const PRICE_API_URL = "https://script.google.com/macros/s/AKfycbxZPkYvWxfQCgsw7kUR9YQW1QN3amfkYrvIkwW06nO7qpAl40oR4ksTFY4BzLl4HpmoPQ/exec";
+const PRICE_API_URL = "https://script.google.com/macros/s/AKfycbwENDt-whUcI3CPiOzooL-EKySIQSXtD7xTJKRPzyTyGs3of7G6KqwaQs8VaPHjls1Ulg/exec";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -1648,7 +1648,8 @@ function renderQuoteBar() {
     return;
   }
   const srcs = new Set(Object.values(quotes).map(q => q.src));
-  const kind = srcs.has("realtime") ? (isTradingTime() ? "盤中即時（開盤時每分鐘更新）" : "最新成交價") : srcs.size ? "收盤價" : "";
+  const live = srcs.has("realtime") || srcs.has("yahoo");
+  const kind = live ? (isTradingTime() ? "盤中即時（開盤時每分鐘更新）" : "最新成交價") : srcs.size ? "前一個交易日的收盤價" : "";
   el.innerHTML = `<span>${quoteBusy ? "股價更新中…" : quoteErr ? `<span class="uncat">股價更新失敗：${esc(quoteErr)}</span>` : quotesAt ? `股價更新於 ${esc(quotesAt.slice(5, 16).replace("-", "/"))}${kind ? `・${kind}` : ""}` : ""}</span>
     <button class="link-btn" id="btnQuote" ${quoteBusy ? "disabled" : ""}>更新股價</button>`;
   $("btnQuote").onclick = () => refreshQuotes(true);
@@ -1729,7 +1730,7 @@ function renderStocks() {
       <span style="min-width:0">
         <div class="store">${esc(h.name)}<span class="code">${esc(h.code)}</span></div>
         <div class="sub">${fmtP(h.shares)} 股，均價 ${fmtP(h.cost / h.shares)}${h.q
-          ? `，現價 <b style="color:var(--ink)">${fmtP(h.q.price)}</b> <span class="${upDown(h.q.change)}">${h.q.change !== null && h.q.change !== undefined ? `${chg(h.q.change)}（${pctTxt(h.q.pct)}）` : ""}</span>`
+          ? `，現價 <b style="color:var(--ink)">${fmtP(h.q.price)}</b> <span class="${upDown(h.q.change)}">${h.q.change !== null && h.q.change !== undefined ? `${chg(h.q.change)}（${pctTxt(h.q.pct)}）` : ""}</span>${h.q.src === "close" ? ` <span class="tag owe">${esc(String(h.q.time || "").slice(5).replace("-", "/"))} 收盤價，不是即時</span>` : ""}`
           : h.manual
           ? `，現價 ${fmtP(h.manual.price)}（手動，${esc(String(h.manual.at || "").slice(5).replace("-", "/"))}）`
           : `，<span class="uncat">還沒有現價</span>`}</div>
