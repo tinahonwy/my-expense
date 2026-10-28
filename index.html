@@ -257,6 +257,12 @@
   .ded-bot .cur .num-in { width: 110px; padding: 6px 10px; font-size: 16px; }
   .ded-bot .del { margin-left: auto; background: none; border: 0; color: var(--danger); font-size: 13px; padding: 4px; }
   .ded-amt { font-family: var(--num); font-size: 15px; color: var(--ink); }
+  .fix { display: grid; grid-template-columns: 1fr 130px auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--bg); border-radius: 12px; }
+  .fix input[type=text] { border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; background: var(--paper); min-width: 0; width: 100%; }
+  .fix .num-in { background: var(--paper); }
+  .fix .del { background: none; border: 0; color: var(--danger); font-size: 13px; padding: 4px; }
+  .fix-sum { font-size: 13px; color: var(--muted); text-align: right; }
+  .fix-sum b { font-family: var(--num); font-size: 16px; color: var(--ink); }
   .net-sum { display: grid; gap: 2px; background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; font-size: 13px; color: var(--muted); }
   .net-sum b { font-family: var(--num); font-size: 16px; color: var(--ink); font-weight: 600; }
   .net-sum .big { font-size: 26px; color: var(--accent); }
@@ -626,6 +632,11 @@
     <div class="ded-list" id="bDeds"></div>
     <div class="net-sum" id="bNet"></div>
   </div>
+  <div class="an-box" id="bFixBox">
+    <div class="field-head"><p class="sec-title" style="margin:0">每月固定支出</p><button class="link-btn" id="bFixAdd">＋ 新增項目</button></div>
+    <p class="cat-hint" style="margin:0">房租、孝親費這類不是刷卡的固定支出，每一期自己填，沒填就算 0。會先從可以花的錢裡扣掉。如果是用信用卡付，就不用填這裡，不然會重複算。</p>
+    <div class="ded-list" id="bFixes"></div>
+  </div>
   <div class="an-box">
     <p class="sec-title" style="margin:0">收入與目標</p>
     <div class="row2">
@@ -983,7 +994,14 @@ let user = null, unsub = null, txs = [], filter = null, region = null, editingId
 let storeRules = {}, unsubRules = null;       // 店家 → 分類
 let searching = false, allTxs = null, searchQ = "";
 let dupIds = new Set();                       // 可能重複扣款的紀錄
-const EMPTY_BUDGET = { income: 0, save: 0, total: 0, cats: {}, notes: "", salary: null, periodVar: {} };
+const EMPTY_BUDGET = { income: 0, save: 0, total: 0, cats: {}, notes: "", salary: null, periodVar: {}, fixed: null, periodFixed: {} };
+// 每月固定支出（房租、孝親費…）：項目名稱固定，金額每一期自己填，沒填算 0
+const DEFAULT_FIXED = ["房租", "孝親費"];
+const fixedNames = () => Array.isArray(BUDGET.fixed) ? BUDGET.fixed : DEFAULT_FIXED;
+function fixedFor(c) {
+  const p = BUDGET.periodFixed?.[keyOf(c)] || {};
+  return fixedNames().reduce((s, n) => s + (+p[n] || 0), 0);
+}
 // 台灣常見的薪資扣款，第一次打開預算規劃時先列出來，都可以改
 // 勞保：投保薪資 × 12.5%（含就業保險）× 自付 20% = 2.5%；健保：投保薪資 × 5.17% × 自付 30% = 1.551%
 // 投保薪資沒填時，照投保級距表找「大於等於本薪的最低一級」；勞保最高 45,800
@@ -1297,7 +1315,10 @@ function renderBudget(twd) {
   const hasSalary = BUDGET.salary && +BUDGET.salary.gross > 0;
   // 總預算：有填就用；沒填用分類預算加總；都沒有就用「收入 − 想存」
   const catSumB = catB.reduce((s, [, v]) => s + +v, 0);
-  const autoB = !+BUDGET.total && !catSumB && income > saveGoal ? income - saveGoal : 0;
+  const fixedAmt = fixedFor(ym);
+  const fixedFilled = BUDGET.periodFixed?.[keyOf(ym)] || {};
+  const fixedMissing = fixedNames().filter(n => fixedFilled[n] === undefined);
+  const autoB = !+BUDGET.total && !catSumB && income > saveGoal + fixedAmt ? income - fixedAmt - saveGoal : 0;
   const totalB = +BUDGET.total || catSumB || autoB;
   $("budMini").classList.add("hidden");
   if (!totalB && !income) {
@@ -1323,7 +1344,7 @@ function renderBudget(twd) {
       <div class="bud-big ${remain < 0 ? "over" : ""}"><small>${remain < 0 ? "已超支 NT$" : isCurrent ? "還可以花 NT$" : "結餘 NT$"}</small>${fmt(Math.abs(remain))}</div>
       <div class="bud-sub">已花 <b>${fmt(spent)}</b> ／ 預算 <b>${fmt(totalB)}</b>（${Math.round(pct)}%）</div>
       <div class="prog"><span class="${remain < 0 ? "over" : ""}" style="width:${Math.min(Math.max(pct, 0), 100).toFixed(1)}%"></span>${isCurrent ? `<i style="left:${(elapsed / days * 100).toFixed(1)}%" title="今天"></i>` : ""}</div>`;
-    if (autoB) lines.push(`預算＝${hasSalary ? "實發" : "收入"} ${fmt(income)} − 想存 ${fmt(saveGoal)}`);
+    if (autoB) lines.push(`預算＝${hasSalary ? "實發" : "收入"} ${fmt(income)}${fixedAmt ? ` − 固定支出 ${fmt(fixedAmt)}` : ""} − 想存 ${fmt(saveGoal)}`);
     if (isCurrent && remain > 0) lines.push(`還有 ${leftDays} 天，平均每天可以花 <b>${fmt(remain / leftDays)}</b>`);
     // 首頁最上面的總覽也放一條預算進度，點了捲到下方的預算卡片
     const mini = $("budMini");
@@ -1341,10 +1362,13 @@ function renderBudget(twd) {
   }
   if (income && !autoB) {
     const use = proj ?? spent;
-    const bal = income - use;
-    let t = `${proj !== null ? "預估本期結餘" : "本期結餘"}（${hasSalary ? "實發" : "收入"} ${fmt(income)} − 支出）<b>${fmt(bal)}</b>`;
+    const bal = income - fixedAmt - use;
+    let t = `${proj !== null ? "預估本期結餘" : "本期結餘"}（${hasSalary ? "實發" : "收入"} ${fmt(income)}${fixedAmt ? ` − 固定支出 ${fmt(fixedAmt)}` : ""} − 支出）<b>${fmt(bal)}</b>`;
     if (saveGoal) t += bal >= saveGoal ? `，達成存錢目標 ${fmt(saveGoal)}` : `，<span class="warn">離存錢目標還差 <b>${fmt(saveGoal - bal)}</b></span>`;
     lines.push(t);
+  }
+  if (isCurrent && fixedMissing.length && (income || totalB)) {
+    lines.push(`${fixedMissing.map(esc).join("、")}本期還沒填，目前算 0　<button class="link-btn" id="budFix">去填</button>`);
   }
   const byCat = {};
   twd.forEach(t => { const c = t.category || UNCAT; byCat[c] = (byCat[c] || 0) + net(t); });
@@ -1360,6 +1384,7 @@ function renderBudget(twd) {
         <span class="v ${x.v > x.b ? "over" : ""}"><b>${fmt(x.v)}</b> / ${fmt(x.b)}</span>
       </div>`).join("")}</div>` : ""}`;
   $("budEdit").onclick = openBudget;
+  if ($("budFix")) $("budFix").onclick = () => { openBudget(); setTimeout(() => $("bFixBox").scrollIntoView({ block: "start" }), 50); };
 }
 
 function renderList(shown, pool, withYear) {
@@ -1637,6 +1662,9 @@ function openBudget() {
   $("bDeds").innerHTML = "";
   (sal.items?.length ? sal.items : DEFAULT_DEDS)
     .forEach(it => $("bDeds").append(dedRow(it, BUDGET.periodVar?.[keyOf(CUR)]?.[it.name])));
+  $("bFixes").innerHTML = "";
+  const pf = BUDGET.periodFixed?.[keyOf(CUR)] || {};
+  fixedNames().forEach(n => $("bFixes").append(fixRow(n, pf[n])));
   $("bSave").value = +BUDGET.save || "";
   $("bTotal").value = +BUDGET.total || "";
   $("bNotes").value = BUDGET.notes || "";
@@ -1691,6 +1719,22 @@ function dedRow(it = {}, cur) {
   row.querySelectorAll("input, select").forEach(el => el.addEventListener("input", budgetHint));
   return row;
 }
+function fixRow(name = "", amt) {
+  const row = document.createElement("div");
+  row.className = "fix";
+  row.innerHTML = `
+    <input type="text" class="f-name" placeholder="例如：房租" maxlength="12" value="${esc(name)}" aria-label="固定支出項目">
+    <input type="number" class="num-in f-amt" inputmode="numeric" min="0" placeholder="${CUR.m} 月帳單" value="${amt ?? ""}" aria-label="本期金額">
+    <button type="button" class="del">刪除</button>`;
+  row.querySelector(".del").onclick = () => { row.remove(); budgetHint(); };
+  row.querySelectorAll("input").forEach(el => el.addEventListener("input", budgetHint));
+  return row;
+}
+function readFixed() {
+  return [...$("bFixes").children].map(r => ({ name: r.querySelector(".f-name").value.trim(), amt: r.querySelector(".f-amt").value }))
+    .filter(f => f.name);
+}
+$("bFixAdd").onclick = () => { const r = fixRow(); $("bFixes").append(r); r.querySelector(".f-name").focus(); };
 function readSalary() {
   const items = [...$("bDeds").children].map(r => ({
     name: r.querySelector(".d-name").value.trim(),
@@ -1728,14 +1772,16 @@ function budgetHint() {
   if (useSal) $("bNet").innerHTML = `
     <span>本薪 <b>${fmt(sal.gross)}</b> − 扣款 <b>${fmt(ded)}</b>${sal.other ? ` ＋ 其他收入 <b>${fmt(sal.other)}</b>` : ""}</span>
     <span>${CUR.m} 月帳單實際拿到 <b class="big">${fmt(salNet)}</b></span>`;
+  const fx = readFixed().reduce((s, f) => s + (+f.amt || 0), 0);
   const inc = +$("bIncome").value || 0, sv = +$("bSave").value || 0;
+  const can = inc - fx - sv;
   const bits = [];
   if (catSum) bits.push(`分類預算加總 ${fmt(catSum)}`);
-  if (!+$("bTotal").value && !catSum && inc > sv) bits.push(`總預算沒填，會用「收入 − 想存」＝ ${fmt(inc - sv)}`);
-  if (inc) bits.push(`收入 − 想存 = 最多可以花 ${fmt(inc - sv)}`);
+  if (inc) bits.push(`收入${fx ? ` − 固定支出 ${fmt(fx)}` : ""} − 想存 = 最多可以花 ${fmt(can)}`);
+  if (!+$("bTotal").value && !catSum && can > 0) bits.push(`總預算沒填，就用這個 ${fmt(can)}`);
   if (budAvg.__total) bits.push(`近 3 期平均每期花 ${fmt(budAvg.__total)}`);
   const tot = +$("bTotal").value || catSum;
-  if (inc && tot > inc - sv) bits.push(`⚠ 預算比可以花的多了 ${fmt(tot - (inc - sv))}`);
+  if (inc && tot > can) bits.push(`⚠ 預算比可以花的多了 ${fmt(tot - can)}`);
   $("bTotalHint").textContent = bits.join("；");
 }
 ["bIncome", "bSave", "bTotal", "bGross", "bOther"].forEach(id => $(id).oninput = budgetHint);
@@ -1762,7 +1808,14 @@ $("btnBudSave").onclick = async () => {
   const periodVar = { ...(BUDGET.periodVar || {}) };
   periodVar[k] = Object.fromEntries(sal.items.filter(it => it.variable && it.cur !== "").map(it => [it.name, +it.cur]));
   Object.keys(periodVar).sort().slice(0, -12).forEach(x => delete periodVar[x]);
+  const fixes = readFixed();
+  const fnames = fixes.map(f => f.name);
+  if (new Set(fnames).size !== fnames.length) return toast("固定支出項目名稱重複了");
+  const periodFixed = { ...(BUDGET.periodFixed || {}) };
+  periodFixed[k] = Object.fromEntries(fixes.filter(f => f.amt !== "").map(f => [f.name, +f.amt]));
+  Object.keys(periodFixed).sort().slice(0, -24).forEach(x => delete periodFixed[x]);
   const data = {
+    fixed: fnames, periodFixed,
     income: sal.gross > 0 ? (BUDGET.income || 0) : +$("bIncome").value || 0,
     save: +$("bSave").value || 0, total: +$("bTotal").value || 0,
     salary: { gross: sal.gross, other: sal.other, items: sal.items.map(({ cur, ...it }) => it) },
