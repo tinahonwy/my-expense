@@ -280,6 +280,35 @@
   .fix .del { background: none; border: 0; color: var(--danger); font-size: 13px; padding: 4px; }
   .fix-sum { font-size: 13px; color: var(--muted); text-align: right; }
   .fix-sum b { font-family: var(--num); font-size: 16px; color: var(--ink); }
+  .as-big { font-family: var(--num); font-size: 40px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .as-big small { font-size: .42em; color: var(--muted); margin-right: 4px; font-weight: 600; }
+  .as-big.neg { color: var(--danger); }
+  .as-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .as-grid div { font-size: 12px; color: var(--muted); min-width: 0; }
+  .as-grid b { display: block; font-family: var(--num); font-size: 22px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .as-grid b.neg { color: var(--danger); }
+  .as-calc { display: grid; font-size: 14px; }
+  .as-calc .ln { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+  .as-calc .ln:first-child { border-top: 0; }
+  .as-calc .ln span:first-child { color: var(--muted); min-width: 0; }
+  .as-calc .ln b { font-family: var(--num); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .as-calc .ln.tot { border-top: 2px solid var(--ink); font-weight: 700; }
+  .as-calc .ln.tot span:first-child { color: var(--ink); }
+  .as-calc .ln.tot b { font-size: 20px; }
+  .as-calc .plus b { color: var(--accent); }
+  .as-calc .minus b { color: var(--danger); }
+  .sal-row { display: grid; grid-template-columns: 1fr 140px; gap: 10px; align-items: center; padding: 8px 10px; background: var(--bg); border-radius: 12px; }
+  .sal-row .num-in { background: var(--paper); }
+  .sal-row small { display: block; font-size: 12px; color: var(--muted); }
+  .sal-row .st { font-size: 11px; padding: 0 6px; border-radius: 6px; margin-left: 6px; background: var(--accent-soft); color: var(--accent); }
+  .sal-row .st.wait { background: var(--paper); color: var(--muted); }
+  .save-row { display: grid; grid-template-columns: 84px 1fr 110px; gap: 10px; align-items: center; padding: 6px 0; font-size: 13px; }
+  .save-row .tr { height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; }
+  .save-row .tr span { display: block; height: 100%; border-radius: 5px; background: var(--accent); }
+  .save-row .tr span.neg { background: var(--danger); }
+  .save-row .v { text-align: right; font-family: var(--num); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .save-row .v small { display: block; font-family: var(--text); font-size: 11px; font-weight: 400; color: var(--muted); }
+  .save-row .v.neg { color: var(--danger); }
   .net-sum { display: grid; gap: 2px; background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; font-size: 13px; color: var(--muted); }
   .net-sum b { font-family: var(--num); font-size: 16px; color: var(--ink); font-weight: 600; }
   .net-sum .big { font-size: 26px; color: var(--accent); }
@@ -710,7 +739,31 @@
     </select>
     最低手續費 <input id="stMin" type="number" inputmode="numeric" min="0" aria-label="最低手續費"> 元
   </div>
-  <p class="cat-hint" style="margin:0 4px">股票紀錄獨立計算，不會算進每期消費。成本用平均成本法計算；紅色代表賺、綠色代表賠。</p>
+  <p class="cat-hint" style="margin:0 4px">股票紀錄不會算進每期消費和預算，但會從「資產總覽」的現金扣掉（賣出和股利會加回來）。成本用平均成本法計算；紅色代表賺、綠色代表賠。</p>
+</main>
+
+<!-- 資產總覽 -->
+<main id="assets" class="wrap hidden">
+  <div class="an-head">
+    <button class="icon-btn back-btn" aria-label="返回"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
+    <h2>資產總覽</h2>
+    <button class="btn-primary" id="btnBase">更新存款</button>
+  </div>
+  <div class="an-box" id="asSum"></div>
+  <div class="an-box" id="asCalcBox">
+    <p class="sec-title" style="margin:0">怎麼算出來的</p>
+    <div class="as-calc" id="asCalc"></div>
+  </div>
+  <div class="an-box" id="asSalBox">
+    <p class="sec-title" style="margin:0">每月 1 號薪水</p>
+    <p class="cat-hint" style="margin:0">空白＝用預算規劃算出來的實發。那個月薪水不一樣（例如用餐費不同、有獎金），就直接填實際入帳的金額。</p>
+    <div class="ded-list" id="asSal"></div>
+  </div>
+  <div class="an-box">
+    <p class="sec-title" style="margin:0">每期存了多少</p>
+    <p class="cat-hint" style="margin:0">實發 − 固定支出 − 那一期記到的消費。進行中的這一期是到今天為止。</p>
+    <div id="asSave"></div>
+  </div>
 </main>
 
 <!-- 固定支出／訂閱 -->
@@ -810,6 +863,32 @@
   </div>
 </dialog>
 
+<dialog id="dlgBase">
+  <form class="dlg" method="dialog" id="baseForm">
+    <div class="dlg-head"><h3>更新存款</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+    <p class="cat-hint" style="margin:0">打開銀行 App，照現在的數字填。之後網頁會從這一天開始自動算：每月 1 號加上薪水，扣掉固定支出和你記到的消費。數字跟銀行對不上時，再來這裡更新一次就好。</p>
+    <div class="row2">
+      <div class="field"><label for="aDate">日期</label><input type="date" id="aDate" required></div>
+      <div class="field"><label for="aBank">銀行存款合計</label><input class="num-in" type="number" id="aBank" inputmode="numeric" placeholder="0" required></div>
+    </div>
+    <div class="field">
+      <label for="aCard">已經出帳、還沒繳的卡費</label>
+      <input class="num-in" type="number" id="aCard" inputmode="numeric" min="0" placeholder="0（已經繳了就填 0）">
+      <small id="aCardHint"></small>
+    </div>
+    <div class="field">
+      <label for="aRecv">公司（或別人）還沒還我的錢</label>
+      <input class="num-in" type="number" id="aRecv" inputmode="numeric" min="0" placeholder="0">
+      <small>例如先幫公司墊的錢。拿到之後，下次更新存款時改回 0。</small>
+    </div>
+    <div class="info" id="aUnbilled"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn-cancel" id="btnBaseCancel">取消</button>
+      <button type="submit" class="btn-primary" id="btnBaseSave">儲存</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="dlgPrice">
   <form class="dlg" method="dialog" id="prForm">
     <div class="dlg-head"><h3 id="prTitle">更新現價</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
@@ -827,6 +906,7 @@
   <div class="dlg">
     <div class="dlg-head"><h3 id="menuName"></h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <div class="menu-list">
+      <button class="btn-ghost" id="btnAssets"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.5"/><circle cx="16" cy="13.5" r="1.2" fill="currentColor"/></svg>資產總覽</button>
       <button class="btn-ghost" id="btnBudget"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>預算規劃</button>
       <button class="btn-ghost" id="btnStocks"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg>股票投資</button>
       <button class="btn-ghost" id="btnSubs"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/></svg>固定支出／訂閱</button>
@@ -1059,6 +1139,7 @@ function incomeFor(c) {
   return +sal.gross - ded + (+sal.other || 0);
 }
 let BUDGET = { ...EMPTY_BUDGET }, unsubBudget = null;
+let ASSETS = { base: null, salary: {} }, unsubAssets = null;
 const isAbroad = t => !!t.region && t.region !== "TW";
 const net = t => (+t.amount || 0) - (+t.paidBack || 0);     // 我實際花的 = 金額 − 別人分攤
 const isTwd = t => !t.currency || t.currency === "TWD";
@@ -1078,7 +1159,7 @@ const keyOf = c => `${c.y}-${pad(c.m)}`;
 function backCycles(c, k) { let y = c.y, m = c.m - k; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } return { y, m }; }
 
 // ===== 頁面切換 =====
-const VIEWS = ["app", "analysis", "budget", "stocks", "subs"];
+const VIEWS = ["app", "analysis", "budget", "stocks", "subs", "assets"];
 function showView(v) {
   VIEWS.forEach(x => $(x).classList.toggle("hidden", x !== v));
   $("btnAdd").classList.toggle("hidden", v !== "app");
@@ -1127,8 +1208,9 @@ $("btnLogin").onclick = async () => {
 
 // 換帳號或登出時，把上一個帳號留在畫面和記憶體裡的資料全部清掉
 function resetSession() {
-  [unsub, unsubCats, unsubRules, unsubBudget, unsubStocks, unsubStSet].forEach(f => f && f());
-  unsub = unsubCats = unsubRules = unsubBudget = unsubStocks = unsubStSet = null;
+  [unsub, unsubCats, unsubRules, unsubBudget, unsubStocks, unsubStSet, unsubAssets].forEach(f => f && f());
+  unsub = unsubCats = unsubRules = unsubBudget = unsubStocks = unsubStSet = unsubAssets = null;
+  ASSETS = { base: null, salary: {} };
   txs = []; allTxs = null; cycleCache = {}; clearAn();
   storeRules = {}; CATEGORIES = DEFAULT_CATEGORIES; BUDGET = { ...EMPTY_BUDGET };
   stockTxs = []; stocksLoaded = false; stockSet = { prices: {}, discount: 10, minFee: 20, feeMode: "zero" };
@@ -1137,7 +1219,7 @@ function resetSession() {
   anStart = null; anData = null; searchFrom = null;
   ym = { ...CUR };
   if (searching) { searching = false; $("searchBar").classList.add("hidden"); $("searchSum").classList.add("hidden"); $("receipt").classList.remove("hidden"); }
-  ["analysis", "budget", "stocks", "subs"].forEach(v => $(v).classList.add("hidden"));
+  ["analysis", "budget", "stocks", "subs", "assets"].forEach(v => $(v).classList.add("hidden"));
   document.querySelectorAll("dialog[open]").forEach(d => d.close());
   $("list").innerHTML = ""; $("total").textContent = "…"; $("trend").classList.add("hidden");
   $("budCard").classList.add("hidden");
@@ -1167,6 +1249,12 @@ onAuthStateChanged(auth, async u => {
     unsubBudget = onSnapshot(doc(db, "users", u.uid, "settings", "budget"), snap => {
       BUDGET = { ...EMPTY_BUDGET, ...(snap.exists() ? snap.data() : {}) };
       if (unsub && !searching) render();
+      scheduleAssets();
+    });
+    unsubAssets = onSnapshot(doc(db, "users", u.uid, "settings", "assets"), snap => {
+      const d = snap.exists() ? snap.data() : {};
+      ASSETS = { base: d.base || null, salary: d.salary || {} };
+      scheduleAssets();
     });
     // 讀這個人的帳單結帳日，再開始載入資料
     try {
@@ -1692,6 +1780,220 @@ async function openSubs() {
 }
 $("btnSubs").onclick = openSubs;
 
+// ===== 資產總覽 =====
+// 做法：你輸入某一天的「存款、還沒繳的卡費、別人欠你的錢」當起點，
+// 之後自動 ＋ 每月 1 號薪水、− 固定支出、− 記到的消費（刷卡的算欠款，所以一樣扣），再加上股票市值
+const ymKey = (y, m) => `${y}-${pad(m)}`;
+const defaultSalary = (y, m) => incomeFor(cycleOf(y, m, 1));
+const salaryOf = (y, m) => { const v = ASSETS.salary?.[ymKey(y, m)]; return v !== undefined && v !== null && v !== "" ? +v : defaultSalary(y, m); };
+// after < 日期 ≤ until 的每月 1 號
+function firstsBetween(after, until) {
+  const out = [];
+  let [y, m] = after.split("-").map(Number);
+  m++; if (m > 12) { m = 1; y++; }
+  for (let i = 0; i < 240; i++) {
+    const d = `${y}-${pad(m)}-01`;
+    if (d > until) break;
+    out.push({ y, m, d });
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  return out;
+}
+function stockValue() {
+  const { H } = calcHoldings();
+  let v = 0, priced = true;
+  Object.values(H).forEach(h => {
+    if (h.shares <= 0) return;
+    const p = quotes[h.code]?.price ?? stockSet.prices[h.code]?.price;
+    if (p === undefined) priced = false;
+    v += p !== undefined ? h.shares * p : h.cost;
+  });
+  return { v, priced, n: Object.values(H).filter(h => h.shares > 0).length };
+}
+let assetsTimer;
+function scheduleAssets() {
+  if (!user || $("assets").classList.contains("hidden")) return;
+  clearTimeout(assetsTimer);
+  assetsTimer = setTimeout(renderAssets, 200);
+}
+function openAssets() {
+  leaveMain();
+  showView("assets");
+  ensureStocks();
+  refreshQuotes(false);
+  renderAssets();
+}
+$("btnAssets").onclick = openAssets;
+
+let assetsToken = 0;
+async function renderAssets() {
+  if ($("assets").classList.contains("hidden")) return;
+  const token = ++assetsToken;
+  const today = ymd(new Date());
+  const base = ASSETS.base;
+  $("asCalcBox").classList.toggle("hidden", !base);
+  renderSalaryRows(base, today);
+  renderSavings(token);
+  if (!base) {
+    $("asSum").innerHTML = `
+      <div class="an-meta">先輸入一次現在的存款，網頁就會開始幫你算總資產。</div>
+      <p class="cat-hint" style="margin:0">之後每月 1 號會自動加上薪水，扣掉固定支出和你記到的消費。股票會自動算市值。</p>
+      <button class="btn-primary" id="asStart">輸入現在的存款</button>`;
+    $("asStart").onclick = openBase;
+    return;
+  }
+  const cyc = cycleOf(...base.date.split("-").map(Number));
+  const curStart = cycleRange(cyc).start;
+  let data;
+  try { data = await loadSince(curStart < base.date ? curStart : base.date); }
+  catch (e) { $("asSum").innerHTML = `<div class="an-meta">讀取失敗：${esc(e.code || e.message)}</div>`; return; }
+  if (token !== assetsToken) return;
+  const twd = data.filter(isTwd);
+  // 起點那天，這一期已經刷了、還沒出帳的卡費
+  const unbilled = twd.filter(t => t.source === "gmail" && t.date >= curStart && t.date <= base.date).reduce((s, t) => s + (+t.amount || 0), 0);
+  const spentAfter = twd.filter(t => t.date > base.date && t.date <= today).reduce((s, t) => s + net(t), 0);
+  const firsts = firstsBetween(base.date, today);
+  const sal = firsts.map(f => ({ ...f, v: salaryOf(f.y, f.m), fx: fixedFor(cycleOf(f.y, f.m, 1)) }));
+  const salSum = sal.reduce((s, x) => s + x.v, 0), fixSum = sal.reduce((s, x) => s + x.fx, 0);
+  const bank = +base.bank || 0, card = +base.card || 0, recv = +base.recv || 0;
+  // 起點之後的股票交易：買進扣現金（含手續費）、賣出拿回現金（扣手續費和證交稅）、現金股利加回
+  let stBuy = 0, stSell = 0, stDiv = 0;
+  stockTxs.filter(t => t.date > base.date && t.date <= today).forEach(t => {
+    const sh = +t.shares || 0, pr = +t.price || 0, fee = +t.fee || 0, tax = +t.tax || 0;
+    if (t.type === "buy") stBuy += sh * pr + fee;
+    else if (t.type === "sell") stSell += sh * pr - fee - tax;
+    else if (t.type === "div") stDiv += +t.amount || 0;
+  });
+  const cash = bank + recv - card - unbilled + salSum - fixSum - spentAfter - stBuy + stSell + stDiv;
+  const st = stockValue();
+  const total = cash + st.v;
+  const bd = base.date.slice(5).replace("-", "/").replace(/^0/, "");
+  $("asSum").innerHTML = `
+    <div>
+      <div class="an-meta">總資產（估計到今天）</div>
+      <div class="as-big ${total < 0 ? "neg" : ""}"><small>NT$</small>${fmt(total)}</div>
+      <div class="an-meta">從 ${bd} 你輸入的存款開始算${st.n ? "，含股票市值" : ""}</div>
+    </div>
+    <div class="as-grid">
+      <div>現金（扣掉卡費後）<b class="${cash < 0 ? "neg" : ""}">${fmt(cash)}</b><small>真正能用的錢</small></div>
+      <div>股票市值<b>${st.n ? fmt(st.v) : "—"}</b><small>${st.n ? (st.priced ? `${st.n} 檔` : "部分用成本估") : "還沒有股票紀錄"}</small></div>
+    </div>`;
+  const ln = (label, v, cls = "") => `<div class="ln ${cls}"><span>${label}</span><b>${v < 0 ? "−" : cls === "plus" ? "＋" : ""}${fmt(Math.abs(v))}</b></div>`;
+  const rows = [ln(`${bd} 銀行存款`, bank)];
+  if (recv) rows.push(ln("別人還沒還我的錢", recv, "plus"));
+  if (card) rows.push(ln("已出帳、還沒繳的卡費", -card, "minus"));
+  if (unbilled) rows.push(ln(`本期到 ${bd} 已刷、還沒出帳`, -unbilled, "minus"));
+  sal.forEach(x => {
+    rows.push(ln(`${x.m}/1 薪水`, x.v, "plus"));
+    if (x.fx) rows.push(ln(`${x.m}/1 固定支出（${fixedNames().map(esc).join("、")}）`, -x.fx, "minus"));
+  });
+  rows.push(ln(`${bd} 之後記到的消費`, -spentAfter, "minus"));
+  if (stBuy) rows.push(ln(`${bd} 之後買股票（含手續費）`, -stBuy, "minus"));
+  if (stSell) rows.push(ln(`${bd} 之後賣股票拿回`, stSell, "plus"));
+  if (stDiv) rows.push(ln(`${bd} 之後領到的現金股利`, stDiv, "plus"));
+  rows.push(ln("現金合計", cash, "tot"));
+  if (st.n) { rows.push(ln("股票市值", st.v, "plus")); rows.push(ln("總資產", total, "tot")); }
+  $("asCalc").innerHTML = rows.join("");
+}
+
+function renderSalaryRows(base, today) {
+  // 從起點之後的每月 1 號，到下一次發薪（最多列 12 個月）
+  const t = new Date();
+  const next = t.getDate() === 1 ? ymd(t) : `${t.getMonth() === 11 ? t.getFullYear() + 1 : t.getFullYear()}-${pad(t.getMonth() === 11 ? 1 : t.getMonth() + 2)}-01`;
+  const from = base ? base.date : ymd(new Date(t.getFullYear(), t.getMonth(), 0));
+  const list = firstsBetween(from, next).slice(-12).reverse();
+  if (!list.length) { $("asSal").innerHTML = `<p class="cat-hint" style="margin:0">還沒有要入帳的薪水。</p>`; return; }
+  const focused = document.activeElement?.dataset?.ym;
+  $("asSal").innerHTML = list.map(f => {
+    const k = ymKey(f.y, f.m), v = ASSETS.salary?.[k];
+    const done = f.d <= today;
+    return `<div class="sal-row">
+      <span>${f.y}/${f.m}/1<span class="st ${done ? "" : "wait"}">${done ? "已入帳" : "預計"}</span>
+        <small>預設 ${fmt(defaultSalary(f.y, f.m))}</small></span>
+      <input class="num-in" type="number" inputmode="numeric" min="0" data-ym="${k}" placeholder="${fmt(defaultSalary(f.y, f.m))}" value="${v ?? ""}" aria-label="${f.m} 月薪水">
+    </div>`;
+  }).join("");
+  $("asSal").querySelectorAll("input").forEach(i => i.onchange = async () => {
+    const val = i.value === "" ? null : +i.value;
+    const salary = { ...(ASSETS.salary || {}) };
+    if (val === null) delete salary[i.dataset.ym]; else salary[i.dataset.ym] = val;
+    ASSETS.salary = salary;
+    try {
+      await setDoc(doc(db, "users", user.uid, "settings", "assets"), { salary, updatedAt: serverTimestamp() }, { merge: true });
+      toast("薪水已更新");
+    } catch (e) { toast("儲存失敗：" + e.code); }
+  });
+  if (focused) $("asSal").querySelector(`[data-ym="${focused}"]`)?.focus();
+}
+
+async function renderSavings(token) {
+  const list = [];
+  for (let i = 5; i >= 0; i--) list.push(backCycles(CUR, i));
+  try { await loadCycles(list); } catch (e) { return; }
+  if (token !== assetsToken) return;
+  const rows = list.map(c => {
+    const inc = incomeFor(c), fx = fixedFor(c);
+    const sp = (cycleCache[keyOf(c)] || []).filter(isTwd).reduce((s, t) => s + net(t), 0);
+    return { c, inc, saved: inc - fx - sp, cur: c.y === CUR.y && c.m === CUR.m };
+  }).filter(r => r.inc > 0).reverse();
+  if (!rows.length) { $("asSave").innerHTML = `<p class="cat-hint" style="margin:0">到「預算規劃」填好薪資，這裡就會算出每期存了多少。</p>`; return; }
+  const max = Math.max(...rows.map(r => Math.abs(r.saved))) || 1;
+  const done = rows.filter(r => !r.cur);
+  const avg = done.length ? done.reduce((s, r) => s + r.saved, 0) / done.length : null;
+  $("asSave").innerHTML = rows.map(r => `
+    <div class="save-row">
+      <span>${r.c.m} 月帳單${r.cur ? `<small style="display:block;color:var(--muted);font-size:11px">進行中</small>` : ""}</span>
+      <div class="tr"><span class="${r.saved < 0 ? "neg" : ""}" style="width:${(Math.abs(r.saved) / max * 100).toFixed(1)}%"></span></div>
+      <span class="v ${r.saved < 0 ? "neg" : ""}">${r.saved < 0 ? "−" : ""}${fmt(Math.abs(r.saved))}<small>儲蓄率 ${Math.round(r.saved / r.inc * 100)}%</small></span>
+    </div>`).join("") + (avg !== null ? `<p class="cat-hint" style="margin:8px 0 0">已結束的 ${done.length} 期，平均每期存 <b>${fmt(avg)}</b>${BUDGET.save ? `，目標是 ${fmt(BUDGET.save)}` : ""}。這是用目前的薪資設定往回推算，以前的薪水如果不一樣會有落差。</p>` : "");
+}
+
+// 更新存款
+async function openBase() {
+  const b = ASSETS.base || {};
+  $("aDate").value = ymd(new Date());
+  $("aBank").value = b.bank ?? "";
+  $("aCard").value = "";
+  $("aRecv").value = b.recv || "";
+  $("aCardHint").textContent = "";
+  $("aUnbilled").textContent = "";
+  $("dlgBase").showModal();
+  baseHints();
+}
+async function baseHints() {
+  const d = $("aDate").value;
+  if (!d) return;
+  const cur = cycleOf(...d.split("-").map(Number)), prev = backCycles(cur, 1);
+  try { await loadCycles([cur, prev]); } catch (e) { return; }
+  const cardSum = arr => (arr || []).filter(t => isTwd(t) && t.source === "gmail").reduce((s, t) => s + (+t.amount || 0), 0);
+  const prevCard = cardSum(cycleCache[keyOf(prev)]);
+  const unb = cardSum((cycleCache[keyOf(cur)] || []).filter(t => t.date <= d));
+  $("aCardHint").innerHTML = prevCard
+    ? `請填銀行帳單上的「本期應繳總額」，有預先繳過的要扣掉。參考：網頁記到上一期（${prev.m} 月帳單）刷卡 ${fmt(prevCard)} <button type="button" class="link-btn" id="aCardFill">用這個</button>`
+    : "請填銀行帳單上的「本期應繳總額」，有預先繳過的要扣掉";
+  if ($("aCardFill")) $("aCardFill").onclick = () => { $("aCard").value = prevCard; };
+  const r = cycleRange(cur);
+  $("aUnbilled").innerHTML = `這一期（${r.label.split(" – ")[0]} 到 ${d.slice(5).replace("-", "/")}）已經刷了 <b>${fmt(unb)}</b>、還沒出帳，網頁會自動算進去，不用填。`;
+}
+$("aDate").onchange = baseHints;
+$("btnBase").onclick = openBase;
+$("btnBaseCancel").onclick = () => $("dlgBase").close();
+$("baseForm").onsubmit = async e => {
+  e.preventDefault();
+  const base = { date: $("aDate").value, bank: +$("aBank").value || 0, card: +$("aCard").value || 0, recv: +$("aRecv").value || 0 };
+  if (!base.date || $("aBank").value === "") return toast("請填日期和存款");
+  $("btnBaseSave").disabled = true;
+  try {
+    await setDoc(doc(db, "users", user.uid, "settings", "assets"), { base, updatedAt: serverTimestamp() }, { merge: true });
+    ASSETS.base = base;
+    clearAn();
+    $("dlgBase").close();
+    toast("存款已更新");
+    renderAssets();
+  } catch (err) { toast("儲存失敗：" + err.code); }
+  finally { $("btnBaseSave").disabled = false; }
+};
+
 // ===== 預算規劃 =====
 let budAvg = {};
 function openBudget() {
@@ -1983,6 +2285,7 @@ function calcHoldings() {
 }
 
 function renderStocks() {
+  scheduleAssets();
   if ($("stocks").classList.contains("hidden")) return;
   $("stDisc").value = String(stockSet.discount);
   $("stMin").value = stockSet.minFee;
