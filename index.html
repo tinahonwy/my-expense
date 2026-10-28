@@ -242,6 +242,24 @@
     border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--bg);
     width: 100%; min-width: 0; text-align: right; font-family: var(--num); font-size: 18px; font-variant-numeric: tabular-nums;
   }
+  .num-in { -moz-appearance: textfield; appearance: textfield; }
+  .num-in::-webkit-inner-spin-button, .num-in::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .num-in:read-only { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 600; }
+  .ded-list { display: grid; gap: 10px; }
+  .ded { display: grid; gap: 6px; padding: 8px 10px; background: var(--bg); border-radius: 12px; }
+  .ded .d-mode { padding: 9px 4px; font-size: 14px; }
+  .ded-top { display: grid; grid-template-columns: 1fr 74px 104px; gap: 6px; align-items: center; }
+  .ded input[type=text], .ded select { border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; background: var(--paper); min-width: 0; width: 100%; }
+  .ded .num-in { background: var(--paper); }
+  .ded-bot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; color: var(--muted); }
+  .ded-bot .check-inline { font-size: 13px; color: var(--ink); }
+  .ded-bot .cur { display: flex; align-items: center; gap: 6px; }
+  .ded-bot .cur .num-in { width: 110px; padding: 6px 10px; font-size: 16px; }
+  .ded-bot .del { margin-left: auto; background: none; border: 0; color: var(--danger); font-size: 13px; padding: 4px; }
+  .ded-amt { font-family: var(--num); font-size: 15px; color: var(--ink); }
+  .net-sum { display: grid; gap: 2px; background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; font-size: 13px; color: var(--muted); }
+  .net-sum b { font-family: var(--num); font-size: 16px; color: var(--ink); font-weight: 600; }
+  .net-sum .big { font-size: 26px; color: var(--accent); }
   textarea.notes {
     width: 100%; min-height: 180px; resize: vertical; border: 1px solid var(--line); border-radius: 10px;
     padding: 12px; background: var(--bg); line-height: 1.7;
@@ -584,14 +602,25 @@
     <h2>預算規劃</h2>
   </div>
   <div class="an-box">
+    <p class="sec-title" style="margin:0">薪資與扣款</p>
+    <p class="cat-hint" style="margin:0">照薪資單填，網頁會自動算出實際拿到的錢。「% 投保」要填薪資單上的勞保、健保投保薪資，沒填就用本薪估算。資料只存在你自己的帳號。</p>
+    <div class="row2">
+      <div class="field"><label for="bGross">本薪（應發金額）</label><input class="num-in" type="number" id="bGross" inputmode="numeric" min="0" placeholder="0"></div>
+      <div class="field"><label for="bOther">其他收入（選填）</label><input class="num-in" type="number" id="bOther" inputmode="numeric" min="0" placeholder="0"></div>
+    </div>
+    <div class="field-head"><span style="font-size:13px;color:var(--muted)">公司扣款項目</span><button class="link-btn" id="bDedAdd">＋ 新增扣款項目</button></div>
+    <div class="ded-list" id="bDeds"></div>
+    <div class="net-sum" id="bNet"></div>
+  </div>
+  <div class="an-box">
     <p class="sec-title" style="margin:0">收入與目標</p>
     <div class="row2">
-      <div class="field"><label for="bIncome">每月收入</label><input class="num-in" type="number" id="bIncome" inputmode="numeric" min="0" placeholder="0"></div>
+      <div class="field"><label for="bIncome" id="bIncomeLbl">每月收入</label><input class="num-in" type="number" id="bIncome" inputmode="numeric" min="0" placeholder="0"></div>
       <div class="field"><label for="bSave">每月想存</label><input class="num-in" type="number" id="bSave" inputmode="numeric" min="0" placeholder="0"></div>
     </div>
     <div class="field">
       <label for="bTotal">每月總預算（可以花的錢）</label>
-      <input class="num-in" type="number" id="bTotal" inputmode="numeric" min="0" placeholder="不填就用分類預算加總">
+      <input class="num-in" type="number" id="bTotal" inputmode="numeric" min="0" placeholder="不填＝分類加總">
       <small id="bTotalHint"></small>
     </div>
   </div>
@@ -940,7 +969,33 @@ let user = null, unsub = null, txs = [], filter = null, region = null, editingId
 let storeRules = {}, unsubRules = null;       // 店家 → 分類
 let searching = false, allTxs = null, searchQ = "";
 let dupIds = new Set();                       // 可能重複扣款的紀錄
-const EMPTY_BUDGET = { income: 0, save: 0, total: 0, cats: {}, notes: "" };
+const EMPTY_BUDGET = { income: 0, save: 0, total: 0, cats: {}, notes: "", salary: null, periodVar: {} };
+// 台灣常見的薪資扣款，第一次打開預算規劃時先列出來，都可以改
+// 勞保：投保薪資 × 12.5%（含就業保險）× 自付 20% = 2.5%；健保：投保薪資 × 5.17% × 自付 30% = 1.551%
+const DEFAULT_DEDS = [
+  { name: "所得稅", mode: "pct", value: 5 },
+  { name: "勞保費", mode: "ins", value: 2.5 },
+  { name: "健保費", mode: "ins", value: 1.551 },
+  { name: "團保費", mode: "amt" },
+  { name: "用餐費", mode: "amt", variable: true },
+];
+// 薪資扣款：固定金額、本薪的幾 %、或投保薪資的幾 %；「每期不同」的項目可以填每一期的預計金額
+function dedAmt(it, gross, cycleKey, periodVar) {
+  const base = it.mode === "pct" ? Math.round(gross * (+it.value || 0) / 100)
+    : it.mode === "ins" ? Math.round((+it.base || gross) * (+it.value || 0) / 100)   // 投保薪資 × %，沒填投保薪資就用本薪估
+    : (+it.value || 0);
+  if (!it.variable) return base;
+  const v = periodVar?.[cycleKey]?.[it.name];
+  return v !== undefined && v !== "" && v !== null ? +v : base;
+}
+// 某一期的實際收入：有填薪資就用「本薪 − 扣款 + 其他收入」，沒填就用手動輸入的每月收入
+function incomeFor(c) {
+  const sal = BUDGET.salary;
+  if (!sal || !(+sal.gross > 0)) return +BUDGET.income || 0;
+  const k = keyOf(c);
+  const ded = (sal.items || []).reduce((s, it) => s + dedAmt(it, +sal.gross, k, BUDGET.periodVar), 0);
+  return +sal.gross - ded + (+sal.other || 0);
+}
 let BUDGET = { ...EMPTY_BUDGET }, unsubBudget = null;
 const isAbroad = t => !!t.region && t.region !== "TW";
 const net = t => (+t.amount || 0) - (+t.paidBack || 0);     // 我實際花的 = 金額 − 別人分攤
@@ -1214,7 +1269,8 @@ function renderBudget(twd) {
   el.classList.remove("hidden");
   const catB = Object.entries(BUDGET.cats || {}).filter(([, v]) => +v > 0);
   const totalB = +BUDGET.total || catB.reduce((s, [, v]) => s + +v, 0);
-  const income = +BUDGET.income || 0, saveGoal = +BUDGET.save || 0;
+  const income = incomeFor(ym), saveGoal = +BUDGET.save || 0;
+  const hasSalary = BUDGET.salary && +BUDGET.salary.gross > 0;
   if (!totalB && !income) {
     el.innerHTML = `<div class="card-head"><h3>預算</h3></div>
       <p class="bud-sub" style="margin:6px 0 12px">設定每月預算後，這裡會顯示本期還能花多少、每天可以花多少，以及照目前速度會不會超支。</p>
@@ -1248,7 +1304,7 @@ function renderBudget(twd) {
   if (income) {
     const use = proj ?? spent;
     const bal = income - use;
-    let t = `${proj !== null ? "預估本期結餘" : "本期結餘"}（收入 ${fmt(income)} − 支出）<b>${fmt(bal)}</b>`;
+    let t = `${proj !== null ? "預估本期結餘" : "本期結餘"}（${hasSalary ? "實發" : "收入"} ${fmt(income)} − 支出）<b>${fmt(bal)}</b>`;
     if (saveGoal) t += bal >= saveGoal ? `，達成存錢目標 ${fmt(saveGoal)}` : `，<span class="warn">離存錢目標還差 <b>${fmt(saveGoal - bal)}</b></span>`;
     lines.push(t);
   }
@@ -1537,6 +1593,12 @@ function openBudget() {
   leaveMain();
   showView("budget");
   $("bIncome").value = +BUDGET.income || "";
+  const sal = BUDGET.salary || {};
+  $("bGross").value = +sal.gross || "";
+  $("bOther").value = +sal.other || "";
+  $("bDeds").innerHTML = "";
+  (sal.items?.length ? sal.items : DEFAULT_DEDS)
+    .forEach(it => $("bDeds").append(dedRow(it, BUDGET.periodVar?.[keyOf(CUR)]?.[it.name])));
   $("bSave").value = +BUDGET.save || "";
   $("bTotal").value = +BUDGET.total || "";
   $("bNotes").value = BUDGET.notes || "";
@@ -1568,8 +1630,65 @@ function drawBudgetCats(keepValues) {
   $("bCats").querySelectorAll("input").forEach(i => i.oninput = budgetHint);
   budgetHint();
 }
+function dedRow(it = {}, cur) {
+  const row = document.createElement("div");
+  row.className = "ded";
+  row.innerHTML = `
+    <div class="ded-top">
+      <input type="text" class="d-name" placeholder="項目，例如勞保費" maxlength="12" value="${esc(it.name || "")}" aria-label="扣款項目">
+      <select class="d-mode" aria-label="計算方式"><option value="amt">元</option><option value="pct">% 本薪</option><option value="ins">% 投保</option></select>
+      <input type="number" class="num-in d-val" inputmode="decimal" step="any" min="0" placeholder="0" value="${+it.value || ""}" aria-label="金額或百分比">
+    </div>
+    <div class="ded-bot">
+      <span class="cur d-insw ${it.mode === "ins" ? "" : "hidden"}">投保薪資<input type="number" class="num-in d-base" inputmode="numeric" min="0" placeholder="同本薪" value="${+it.base || ""}" aria-label="投保薪資"></span>
+      <label class="check-inline"><input type="checkbox" class="d-var" ${it.variable ? "checked" : ""}>每期金額不一樣</label>
+      <span class="cur ${it.variable ? "" : "hidden"}">${CUR.m} 月帳單預計<input type="number" class="num-in d-cur" inputmode="numeric" min="0" placeholder="同上" value="${cur ?? ""}" aria-label="本期預計金額"></span>
+      <span class="ded-amt d-show"></span>
+      <button type="button" class="del" aria-label="刪除這個項目">刪除</button>
+    </div>`;
+  row.querySelector(".d-mode").value = ["pct", "ins"].includes(it.mode) ? it.mode : "amt";
+  row.querySelector(".d-mode").addEventListener("change", e => row.querySelector(".d-insw").classList.toggle("hidden", e.target.value !== "ins"));
+  row.querySelector(".d-var").onchange = e => { row.querySelector(".cur").classList.toggle("hidden", !e.target.checked); budgetHint(); };
+  row.querySelector(".del").onclick = () => { row.remove(); budgetHint(); };
+  row.querySelectorAll("input, select").forEach(el => el.addEventListener("input", budgetHint));
+  return row;
+}
+function readSalary() {
+  const items = [...$("bDeds").children].map(r => ({
+    name: r.querySelector(".d-name").value.trim(),
+    mode: r.querySelector(".d-mode").value,
+    value: parseFloat(r.querySelector(".d-val").value) || 0,
+    base: r.querySelector(".d-mode").value === "ins" ? (+r.querySelector(".d-base").value || 0) : 0,
+    variable: r.querySelector(".d-var").checked,
+    cur: r.querySelector(".d-cur").value,
+  })).filter(it => it.name);
+  return { gross: +$("bGross").value || 0, other: +$("bOther").value || 0, items };
+}
+function salaryNet() {
+  const sal = readSalary();
+  const k = keyOf(CUR);
+  const pv = { [k]: Object.fromEntries(sal.items.filter(it => it.variable && it.cur !== "").map(it => [it.name, +it.cur])) };
+  let ded = 0;
+  [...$("bDeds").children].forEach(r => {
+    const name = r.querySelector(".d-name").value.trim();
+    const it = sal.items.find(x => x.name === name);
+    const a = it ? dedAmt(it, sal.gross, k, pv) : 0;
+    ded += a;
+    r.querySelector(".d-show").textContent = it && it.mode !== "amt" && a ? `＝ ${fmt(a)} 元` : "";
+  });
+  return { sal, ded, net: sal.gross - ded + sal.other };
+}
 function budgetHint() {
   const catSum = [...$("bCats").querySelectorAll("input")].reduce((s, i) => s + (+i.value || 0), 0);
+  const { sal, ded, net: salNet } = salaryNet();
+  const useSal = sal.gross > 0;
+  $("bIncome").readOnly = useSal;
+  $("bIncomeLbl").textContent = useSal ? `${CUR.m} 月帳單實發（自動算）` : "每月收入";
+  if (useSal) $("bIncome").value = salNet;
+  $("bNet").classList.toggle("hidden", !useSal);
+  if (useSal) $("bNet").innerHTML = `
+    <span>本薪 <b>${fmt(sal.gross)}</b> − 扣款 <b>${fmt(ded)}</b>${sal.other ? ` ＋ 其他收入 <b>${fmt(sal.other)}</b>` : ""}</span>
+    <span>${CUR.m} 月帳單實際拿到 <b class="big">${fmt(salNet)}</b></span>`;
   const inc = +$("bIncome").value || 0, sv = +$("bSave").value || 0;
   const bits = [];
   if (catSum) bits.push(`分類預算加總 ${fmt(catSum)}`);
@@ -1579,7 +1698,8 @@ function budgetHint() {
   if (inc && tot > inc - sv) bits.push(`⚠ 預算比可以花的多了 ${fmt(tot - (inc - sv))}`);
   $("bTotalHint").textContent = bits.join("；");
 }
-["bIncome", "bSave", "bTotal"].forEach(id => $(id).oninput = budgetHint);
+["bIncome", "bSave", "bTotal", "bGross", "bOther"].forEach(id => $(id).oninput = budgetHint);
+$("bDedAdd").onclick = () => { const r = dedRow(); $("bDeds").append(r); r.querySelector(".d-name").focus(); };
 $("bFillAvg").onclick = () => {
   let n = 0;
   $("bCats").querySelectorAll("input").forEach(i => {
@@ -1594,9 +1714,19 @@ $("btnBudCancel").onclick = () => showView("app");
 $("btnBudSave").onclick = async () => {
   const cats = {};
   $("bCats").querySelectorAll("input").forEach(i => { if (+i.value > 0) cats[i.dataset.cat] = +i.value; });
+  const sal = readSalary();
+  const names = sal.items.map(it => it.name);
+  if (new Set(names).size !== names.length) return toast("扣款項目名稱重複了");
+  // 每期不同的項目：把本期預計金額存在 periodVar[本期]，只保留最近 12 期
+  const k = keyOf(CUR);
+  const periodVar = { ...(BUDGET.periodVar || {}) };
+  periodVar[k] = Object.fromEntries(sal.items.filter(it => it.variable && it.cur !== "").map(it => [it.name, +it.cur]));
+  Object.keys(periodVar).sort().slice(0, -12).forEach(x => delete periodVar[x]);
   const data = {
-    income: +$("bIncome").value || 0, save: +$("bSave").value || 0, total: +$("bTotal").value || 0,
-    cats, notes: $("bNotes").value, updatedAt: serverTimestamp(),
+    income: sal.gross > 0 ? (BUDGET.income || 0) : +$("bIncome").value || 0,
+    save: +$("bSave").value || 0, total: +$("bTotal").value || 0,
+    salary: { gross: sal.gross, other: sal.other, items: sal.items.map(({ cur, ...it }) => it) },
+    periodVar, cats, notes: $("bNotes").value, updatedAt: serverTimestamp(),
   };
   $("btnBudSave").disabled = true;
   try {
