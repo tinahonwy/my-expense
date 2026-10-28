@@ -145,6 +145,23 @@
   .prog > i { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .45; }
   .bud-lines { display: grid; gap: 4px; margin-top: 8px; font-size: 13px; color: var(--muted); }
   .bud-lines .warn, .bud-lines .warn b { color: var(--danger); }
+  .prog-wrap { position: relative; }
+  .prog-wrap.has-today { padding-top: 18px; }
+  .prog-wrap.tap { cursor: pointer; }
+  .prog-wrap .prog { margin-top: 2px; }
+  .prog > i { width: 3px; border-radius: 2px; background: var(--ink); opacity: .55; }
+  .prog > i.fast { background: var(--danger); opacity: .9; }
+  .today { position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; line-height: 1; color: var(--muted); white-space: nowrap; pointer-events: none; }
+  .today em { font-style: normal; display: inline-block; padding: 2px 5px; border-radius: 5px; background: var(--bg); }
+  .today::after { content: ""; position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%); border: 4px solid transparent; border-top-color: var(--bg); }
+  .today.fast em { background: var(--danger-soft); color: var(--danger); }
+  .today.fast::after { border-top-color: var(--danger-soft); }
+  .bud-mini .today em { background: var(--paper); }
+  .bud-mini .today::after { border-top-color: var(--paper); }
+  .prog-explain { font-size: 13px; color: var(--muted); background: var(--bg); border-radius: 10px; padding: 8px 12px; margin-bottom: 6px; }
+  .prog-explain b { color: var(--ink); font-family: var(--num); font-size: 15px; }
+  .prog-explain b:first-child { font-family: var(--text); font-size: 13px; }
+  .prog-explain .warn { color: var(--danger); }
   .bud-cats { display: grid; gap: 10px; margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 14px; }
   .bud-cat { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; font-size: 14px; }
   .bud-cat .prog { margin: 0; height: 8px; }
@@ -483,7 +500,8 @@
   .bud-mini .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--muted); }
   .bud-mini .row b { font-family: var(--num); font-size: 20px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
   .bud-mini .row b.over { color: var(--danger); }
-  .bud-mini .prog { margin: 8px 0 6px; height: 8px; background: var(--paper); }
+  .bud-mini .prog { margin: 2px 0 6px; height: 8px; background: var(--paper); }
+  .bud-mini .prog-wrap { margin-top: 6px; }
   .bud-mini .sub3 { font-size: 12px; color: var(--muted); }
   .bud-mini .sub3 .warn { color: var(--danger); }
   .bar-bud { display: block; font-size: 11px; color: var(--muted); text-align: right; font-family: var(--text); font-weight: 400; }
@@ -1306,6 +1324,23 @@ function render() {
 }
 
 // ===== 本期預算 =====
+// 預算進度條：綠色是已花的比例，直線是「今天」在這一期的位置
+function progBar(pct, over, todayPct, withExplain) {
+  const p = Math.min(Math.max(pct, 0), 100);
+  const fast = todayPct !== null && pct > todayPct + 1;
+  const label = todayPct === null ? "" : `
+    <span class="today ${fast ? "fast" : ""}" style="left:${todayPct.toFixed(1)}%"><em>今天${withExplain ? " ⓘ" : ""}</em></span>`;
+  const bar = `<div class="prog-wrap ${todayPct !== null ? "has-today" : ""} ${withExplain && todayPct !== null ? "tap" : ""}"
+      ${withExplain && todayPct !== null ? `role="button" tabindex="0" aria-label="進度條說明"` : ""}>
+    ${label}
+    <div class="prog"><span class="${over ? "over" : ""}" style="width:${p.toFixed(1)}%"></span>${todayPct !== null ? `<i class="${fast ? "fast" : ""}" style="left:${todayPct.toFixed(1)}%"></i>` : ""}</div>
+  </div>`;
+  if (!withExplain || todayPct === null) return bar;
+  return bar + `<div class="prog-explain hidden">
+      <b>直線＝今天</b>：這一期的時間過了 <b>${Math.round(todayPct)}%</b>，預算用了 <b>${Math.round(pct)}%</b>。
+      ${fast ? `<span class="warn">花得比時間快，照這樣下去可能會超支。</span>` : "綠色在直線左邊，代表花得比時間慢，目前很安全。"}
+    </div>`;
+}
 function renderBudget(twd) {
   const el = $("budCard");
   if (searching) return el.classList.add("hidden");
@@ -1343,7 +1378,7 @@ function renderBudget(twd) {
     head = `
       <div class="bud-big ${remain < 0 ? "over" : ""}"><small>${remain < 0 ? "已超支 NT$" : isCurrent ? "還可以花 NT$" : "結餘 NT$"}</small>${fmt(Math.abs(remain))}</div>
       <div class="bud-sub">已花 <b>${fmt(spent)}</b> ／ 預算 <b>${fmt(totalB)}</b>（${Math.round(pct)}%）</div>
-      <div class="prog"><span class="${remain < 0 ? "over" : ""}" style="width:${Math.min(Math.max(pct, 0), 100).toFixed(1)}%"></span>${isCurrent ? `<i style="left:${(elapsed / days * 100).toFixed(1)}%" title="今天"></i>` : ""}</div>`;
+      ${progBar(pct, remain < 0, isCurrent ? elapsed / days * 100 : null, true)}`;
     if (autoB) lines.push(`預算＝${hasSalary ? "實發" : "收入"} ${fmt(income)}${fixedAmt ? ` − 固定支出 ${fmt(fixedAmt)}` : ""} − 想存 ${fmt(saveGoal)}`);
     if (isCurrent && remain > 0) lines.push(`還有 ${leftDays} 天，平均每天可以花 <b>${fmt(remain / leftDays)}</b>`);
     // 首頁最上面的總覽也放一條預算進度，點了捲到下方的預算卡片
@@ -1351,7 +1386,7 @@ function renderBudget(twd) {
     mini.classList.remove("hidden");
     mini.innerHTML = `
       <div class="row"><span>${remain < 0 ? "本期預算已超支" : isCurrent ? "本期預算還可以花" : "本期預算結餘"}</span><b class="${remain < 0 ? "over" : ""}">${fmt(Math.abs(remain))}</b></div>
-      <div class="prog"><span class="${remain < 0 ? "over" : ""}" style="width:${Math.min(Math.max(pct, 0), 100).toFixed(1)}%"></span>${isCurrent ? `<i style="left:${(elapsed / days * 100).toFixed(1)}%"></i>` : ""}</div>
+      ${progBar(pct, remain < 0, isCurrent ? elapsed / days * 100 : null, false)}
       <div class="sub3">${fmt(spent)} ／ ${fmt(totalB)}${isCurrent && remain > 0 ? `・還有 ${leftDays} 天，每天 ${fmt(remain / leftDays)}` : ""}${proj !== null && proj > totalB ? `・<span class="warn">照目前速度會超支 ${fmt(proj - totalB)}</span>` : ""}</div>`;
     mini.onclick = () => el.scrollIntoView({ behavior: "smooth", block: "start" });
     if (proj !== null) lines.push(proj > totalB
@@ -1384,6 +1419,11 @@ function renderBudget(twd) {
         <span class="v ${x.v > x.b ? "over" : ""}"><b>${fmt(x.v)}</b> / ${fmt(x.b)}</span>
       </div>`).join("")}</div>` : ""}`;
   $("budEdit").onclick = openBudget;
+  // 點進度條：顯示／隱藏說明
+  el.querySelectorAll(".prog-wrap.tap").forEach(w => w.onclick = () => {
+    const n = w.nextElementSibling;
+    if (n?.classList.contains("prog-explain")) n.classList.toggle("hidden");
+  });
   if ($("budFix")) $("budFix").onclick = () => { openBudget(); setTimeout(() => $("bFixBox").scrollIntoView({ block: "start" }), 50); };
 }
 
