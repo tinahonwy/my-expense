@@ -260,6 +260,32 @@
   .st-set input { width: 76px; }
   .code { font-family: var(--num); font-size: 14px; color: var(--muted); font-weight: 500; margin-left: 4px; }
   .tag.div { background: var(--gold-soft); color: var(--gold); }
+  div.hold:hover { background: none; }
+  .hold-act { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+  .hold-act button, .edit-btn {
+    border: 1px solid var(--line); background: var(--paper); border-radius: 8px;
+    padding: 4px 12px; font-size: 13px; color: var(--ink); min-height: 32px;
+  }
+  .hold-act button:hover, .edit-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+  .hold-act .act-buy { color: var(--up); }
+  .hold-act .act-sell { color: var(--down); }
+  .hold-act .act-price { margin-left: auto; color: var(--muted); }
+  .tx-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); }
+  .tx-row:first-child { border-top: 0; }
+  .tx-row .an-amt { display: grid; justify-items: end; gap: 4px; }
+  .edit-btn { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); }
+  .edit-btn svg { width: 13px; height: 13px; }
+  .pick-box { display: grid; gap: 6px; }
+  .pick-box > span { font-size: 13px; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button {
+    border: 1px solid var(--line); background: var(--bg); border-radius: 16px;
+    padding: 5px 12px; font-size: 14px; color: var(--ink);
+  }
+  .chips button small { font-family: var(--num); color: var(--muted); margin-left: 4px; font-size: 13px; }
+  .chips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chips button.on small { color: inherit; opacity: .85; }
+  @media (prefers-color-scheme: dark) { .chips button.on { color: #0F1A1D; } }
   .quote-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin: -8px 4px 18px; }
   .quote-bar .link-btn { flex: none; }
   .quote-bar .link-btn:disabled { opacity: .4; cursor: wait; }
@@ -381,7 +407,7 @@
     .dlg-actions button { flex: 1; }
     .dlg-actions .btn-danger { flex-basis: 100%; order: 3; }
   }
-  .field { display: grid; gap: 4px; min-width: 0; }
+  .field { display: grid; gap: 4px; min-width: 0; align-content: start; }
   .field label { font-size: 13px; color: var(--muted); }
   .field input, .field select {
     border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
@@ -574,9 +600,9 @@
   </div>
   <div class="an-box" id="stSum"></div>
   <div class="quote-bar" id="quoteBar"></div>
-  <div class="sec-h"><span>目前持股</span><small>點一檔可以更新現價</small></div>
+  <div class="sec-h"><span>目前持股</span><small>可以直接加碼買進或賣出</small></div>
   <div class="an-list" id="stHold"></div>
-  <div class="sec-h" style="margin-top:22px"><span>交易紀錄</span><small>點一筆可以修改或刪除</small></div>
+  <div class="sec-h" style="margin-top:22px"><span>交易紀錄</span><small>按「編輯」可以修改或刪除</small></div>
   <div class="an-list" id="stTx"></div>
   <div class="st-set">
     手續費折扣
@@ -643,6 +669,7 @@
     <div class="seg seg-full" id="stType">
       <button type="button" data-t="buy">買進</button><button type="button" data-t="sell">賣出</button><button type="button" data-t="div">股利</button>
     </div>
+    <div class="pick-box hidden" id="stPick"><span>選擇買過的股票</span><div class="chips" id="stChips"></div></div>
     <div class="row2">
       <div class="field"><label for="sDate">日期</label><input type="date" id="sDate" required></div>
       <div class="field"><label for="sCode">股票代號</label><input id="sCode" required placeholder="例如：2330" autocomplete="off" list="stCodes"></div>
@@ -1661,7 +1688,9 @@ function renderStocks() {
     const price = q?.price ?? manual?.price ?? null;
     const value = price !== null ? h.shares * price : null;
     const today = q && q.change !== null && q.change !== undefined ? h.shares * q.change : null;
-    return { ...h, name: h.name === h.code && q?.name ? q.name : h.name, q, manual, price, value, today, pl: value !== null ? value - h.cost : null };
+    // 跟券商一樣，損益先扣掉「現在賣掉」要付的手續費和證交稅
+    const sellCost = value !== null ? sellFee(value) + sellTax(h.code, value) : 0;
+    return { ...h, name: h.name === h.code && q?.name ? q.name : h.name, q, manual, price, value, today, sellCost, pl: value !== null ? value - sellCost - h.cost : null };
   }).sort((a, b) => (b.value ?? b.cost) - (a.value ?? a.cost));
   const cost = holds.reduce((s, h) => s + h.cost, 0);
   const value = holds.reduce((s, h) => s + (h.value ?? h.cost), 0);
@@ -1669,6 +1698,7 @@ function renderStocks() {
   const pl = priced.reduce((s, h) => s + h.pl, 0);
   const plBase = priced.reduce((s, h) => s + h.cost, 0);
   const missing = holds.length - priced.length;
+  const sellCosts = priced.reduce((s, h) => s + h.sellCost, 0);
   const withToday = holds.filter(h => h.today !== null);
   const today = withToday.reduce((s, h) => s + h.today, 0);
   const todayBase = withToday.reduce((s, h) => s + h.value - h.today, 0);
@@ -1680,7 +1710,7 @@ function renderStocks() {
       <div class="an-meta">${holds.length} 檔，投入成本 ${fmt(cost)}${missing ? `，<span class="uncat">${missing} 檔還沒有現價，市值暫時用成本算</span>` : ""}</div>
     </div>
     <div class="st-grid">
-      <div>未實現損益<b class="${upDown(pl)}">${signed(pl)}</b><small class="${upDown(pl)}">${plBase ? (pl >= 0 ? "+" : "") + (pl / plBase * 100).toFixed(2) + "%" : "—"}</small></div>
+      <div>未實現損益<b class="${upDown(pl)}">${signed(pl)}</b><small class="${upDown(pl)}">${plBase ? (pl >= 0 ? "+" : "") + (pl / plBase * 100).toFixed(2) + "%" : "—"}</small><small>已扣預估賣出手續費和稅 ${fmt(sellCosts)}</small></div>
       <div>已實現損益<b class="${upDown(realized)}">${signed(realized)}</b></div>
       <div>累計股利<b>${fmt(divs)}</b></div>
       <div>總損益（含股利）<b class="${upDown(pl + realized + divs)}">${signed(pl + realized + divs)}</b><small>手續費和稅共 ${fmt(costs)}</small></div>
@@ -1688,21 +1718,30 @@ function renderStocks() {
     : `<div class="an-meta">還沒有股票紀錄。按右上角「新增交易」記下你的第一筆買進，就會開始幫你算持股成本和損益。</div>`;
 
   $("stHold").innerHTML = holds.length ? holds.map(h => `
-    <button class="hold" data-code="${esc(h.code)}">
+    <div class="hold" data-code="${esc(h.code)}">
       <span style="min-width:0">
         <div class="store">${esc(h.name)}<span class="code">${esc(h.code)}</span></div>
         <div class="sub">${fmtP(h.shares)} 股，均價 ${fmtP(h.cost / h.shares)}${h.q
           ? `，現價 <b style="color:var(--ink)">${fmtP(h.q.price)}</b> <span class="${upDown(h.q.change)}">${h.q.change !== null && h.q.change !== undefined ? `${chg(h.q.change)}（${pctTxt(h.q.pct)}）` : ""}</span>`
           : h.manual
           ? `，現價 ${fmtP(h.manual.price)}（手動，${esc(String(h.manual.at || "").slice(5).replace("-", "/"))}）`
-          : `，<span class="uncat">點這裡填現價</span>`}</div>
+          : `，<span class="uncat">還沒有現價</span>`}</div>
         ${h.today !== null ? `<div class="sub">今日 <span class="${upDown(h.today)}">${signed(h.today)}</span></div>` : ""}
       </span>
       <span class="an-amt"><b>${fmt(h.value ?? h.cost)}</b>${h.pl !== null
         ? `<small class="${upDown(h.pl)}">${signed(h.pl)}（${h.cost ? (h.pl >= 0 ? "+" : "") + (h.pl / h.cost * 100).toFixed(1) : 0}%）</small>`
         : `<small>成本</small>`}</span>
-    </button>`).join("") : `<div class="empty" style="padding:24px">目前沒有持股</div>`;
-  $("stHold").querySelectorAll(".hold").forEach(b => b.onclick = () => openPrice(b.dataset.code));
+      <div class="hold-act">
+        <button type="button" class="act-buy" data-act="buy">＋ 加碼買進</button>
+        <button type="button" class="act-sell" data-act="sell">賣出</button>
+        <button type="button" class="act-price" data-act="price">手動填現價</button>
+      </div>
+    </div>`).join("") : `<div class="empty" style="padding:24px">目前沒有持股</div>`;
+  $("stHold").querySelectorAll(".hold").forEach(row => row.querySelectorAll("button").forEach(b => b.onclick = () => {
+    const code = row.dataset.code;
+    if (b.dataset.act === "price") openPrice(code);
+    else openStockTx(null, { code, type: b.dataset.act });
+  }));
 
   const TYPE = { buy: ["買進", ""], sell: ["賣出", "owe"], div: ["股利", "div"] };
   const list = [...stockTxs].sort((a, b) => b.date.localeCompare(a.date) || (b.seq || 0) - (a.seq || 0));
@@ -1713,15 +1752,16 @@ function renderStocks() {
     const detail = t.type === "div"
       ? [`現金 ${fmt(t.amount || 0)}`, s ? `配股 ${fmtP(s)} 股` : ""].filter(Boolean).join("，")
       : `${fmtP(s)} 股 @ ${fmtP(p)}`;
-    return `<button class="hold" data-id="${t.id}">
+    return `<div class="tx-row" data-id="${t.id}">
       <span style="min-width:0">
         <div class="store"><span class="tag ${tc}">${tn}</span> ${esc(t.name || t.code)}<span class="code">${esc(t.code)}</span></div>
         <div class="sub">${t.date.replaceAll("-", "/")}，${detail}${t.note ? "，" + esc(t.note) : ""}</div>
       </span>
-      <span class="an-amt"><b>${signed(money)}</b></span>
-    </button>`;
+      <span class="an-amt"><b>${signed(money)}</b>
+        <button type="button" class="edit-btn"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2.5l2 2L5 11H3V9z"/></svg>編輯</button></span>
+    </div>`;
   }).join("") : "";
-  $("stTx").querySelectorAll(".hold").forEach(b => b.onclick = () => openStockTx(stockTxs.find(t => t.id === b.dataset.id)));
+  $("stTx").querySelectorAll(".tx-row").forEach(r => r.querySelector(".edit-btn").onclick = () => openStockTx(stockTxs.find(t => t.id === r.dataset.id)));
 
   // 代號自動完成
   const names = {};
@@ -1750,13 +1790,15 @@ function setStType(t) {
 }
 $("stType").querySelectorAll("button").forEach(b => b.onclick = () => setStType(b.dataset.t));
 
+const sellFee = amt => amt > 0 ? Math.max(Math.floor(amt * 0.001425 * stockSet.discount / 10), stockSet.minFee) : 0;
+const sellTax = (code, amt) => Math.floor(amt * (/^00/.test(code) ? 0.001 : 0.003));
 // 台股手續費 0.1425% × 折扣（有最低金額）；證交稅：股票 0.3%、ETF（代號 00 開頭）0.1%
 function calcStock() {
   const s = +$("sShares").value || 0, p = +$("sPrice").value || 0, amt = s * p;
   const code = $("sCode").value.trim();
   if (stType !== "div") {
-    if (!feeTouched) $("sFee").value = amt > 0 ? Math.max(Math.floor(amt * 0.001425 * stockSet.discount / 10), stockSet.minFee) : "";
-    if (!taxTouched) $("sTax").value = stType === "sell" && amt > 0 ? Math.floor(amt * (/^00/.test(code) ? 0.001 : 0.003)) : "";
+    if (!feeTouched) $("sFee").value = amt > 0 ? sellFee(amt) : "";
+    if (!taxTouched) $("sTax").value = stType === "sell" && amt > 0 ? sellTax(code, amt) : "";
   }
   const fee = +$("sFee").value || 0, tax = +$("sTax").value || 0;
   let html = "";
@@ -1780,6 +1822,7 @@ $("sCode").addEventListener("input", () => {
   if (known && !$("sName").value) $("sName").value = known.name;
   calcStock();
   lookupCode(code);
+  if (!stEditingId) $("stChips").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.code === code));
 });
 // 輸入代號後查現價：自動帶入名稱，新增買進或賣出時預先填入現價
 let lookupTimer;
@@ -1804,9 +1847,35 @@ function lookupCode(code) {
 $("sFee").addEventListener("input", () => { feeTouched = true; calcStock(); });
 $("sTax").addEventListener("input", () => { taxTouched = true; calcStock(); });
 
-function openStockTx(t) {
+// 買過的股票（目前持股排前面，其次是最近交易的）
+function pastStocks() {
+  const { H } = calcHoldings();
+  const last = {};
+  stockTxs.forEach(t => { const c = String(t.code || "").toUpperCase(); if (c && (!last[c] || t.date > last[c])) last[c] = t.date; });
+  return Object.keys(last).map(c => ({ code: c, name: H[c]?.name || c, held: (H[c]?.shares || 0) > 0, last: last[c] }))
+    .sort((a, b) => (b.held - a.held) || b.last.localeCompare(a.last));
+}
+function drawChips() {
+  const list = stEditingId ? [] : pastStocks();
+  $("stPick").classList.toggle("hidden", !list.length);
+  const cur = $("sCode").value.trim().toUpperCase();
+  $("stChips").innerHTML = list.map(s => `<button type="button" data-code="${esc(s.code)}" class="${s.code === cur ? "on" : ""}">${esc(s.name)}<small>${esc(s.code)}</small></button>`).join("");
+  $("stChips").querySelectorAll("button").forEach(b => b.onclick = () => pickStock(b.dataset.code));
+}
+function pickStock(code) {
+  const s = pastStocks().find(x => x.code === code);
+  $("sCode").value = code;
+  $("sName").value = s && s.name !== code ? s.name : "";
+  $("sPrice").value = "";                        // 讓現價重新帶入
+  calcStock();
+  lookupCode(code);
+  drawChips();
+  $("sShares").focus();
+}
+
+function openStockTx(t, preset) {
   stEditingId = t?.id || null;
-  $("stTitle").textContent = t ? "修改交易" : "新增交易";
+  $("stTitle").textContent = t ? "修改交易" : preset?.type === "sell" ? "賣出" : preset ? "加碼買進" : "新增交易";
   $("sDate").value = t?.date || ymd(new Date());
   $("sCode").value = t?.code || "";
   $("sName").value = t?.name || "";
@@ -1819,9 +1888,11 @@ function openStockTx(t) {
   $("sNote").value = t?.note || "";
   feeTouched = taxTouched = !!t;
   $("btnStDelete").classList.toggle("hidden", !t);
-  setStType(t?.type || "buy");
+  setStType(t?.type || preset?.type || "buy");
+  drawChips();
   $("dlgStock").showModal();
-  if (!t) $("sCode").focus();
+  if (preset?.code) pickStock(preset.code);
+  else if (!t) $("sCode").focus();
 }
 $("btnStAdd").onclick = () => openStockTx();
 $("btnStCancel").onclick = () => $("dlgStock").close();
