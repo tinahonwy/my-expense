@@ -634,7 +634,7 @@
     </div>
     <div class="field">
       <label for="bTotal">每月總預算（可以花的錢）</label>
-      <input class="num-in" type="number" id="bTotal" inputmode="numeric" min="0" placeholder="不填＝分類加總">
+      <input class="num-in" type="number" id="bTotal" inputmode="numeric" min="0" placeholder="不填＝自動算">
       <small id="bTotalHint"></small>
     </div>
   </div>
@@ -1283,9 +1283,12 @@ function renderBudget(twd) {
   if (searching) return el.classList.add("hidden");
   el.classList.remove("hidden");
   const catB = Object.entries(BUDGET.cats || {}).filter(([, v]) => +v > 0);
-  const totalB = +BUDGET.total || catB.reduce((s, [, v]) => s + +v, 0);
   const income = incomeFor(ym), saveGoal = +BUDGET.save || 0;
   const hasSalary = BUDGET.salary && +BUDGET.salary.gross > 0;
+  // 總預算：有填就用；沒填用分類預算加總；都沒有就用「收入 − 想存」
+  const catSumB = catB.reduce((s, [, v]) => s + +v, 0);
+  const autoB = !+BUDGET.total && !catSumB && income > saveGoal ? income - saveGoal : 0;
+  const totalB = +BUDGET.total || catSumB || autoB;
   $("budMini").classList.add("hidden");
   if (!totalB && !income) {
     el.innerHTML = `<div class="card-head"><h3>預算</h3></div>
@@ -1310,6 +1313,7 @@ function renderBudget(twd) {
       <div class="bud-big ${remain < 0 ? "over" : ""}"><small>${remain < 0 ? "已超支 NT$" : isCurrent ? "還可以花 NT$" : "結餘 NT$"}</small>${fmt(Math.abs(remain))}</div>
       <div class="bud-sub">已花 <b>${fmt(spent)}</b> ／ 預算 <b>${fmt(totalB)}</b>（${Math.round(pct)}%）</div>
       <div class="prog"><span class="${remain < 0 ? "over" : ""}" style="width:${Math.min(Math.max(pct, 0), 100).toFixed(1)}%"></span>${isCurrent ? `<i style="left:${(elapsed / days * 100).toFixed(1)}%" title="今天"></i>` : ""}</div>`;
+    if (autoB) lines.push(`預算＝${hasSalary ? "實發" : "收入"} ${fmt(income)} − 想存 ${fmt(saveGoal)}`);
     if (isCurrent && remain > 0) lines.push(`還有 ${leftDays} 天，平均每天可以花 <b>${fmt(remain / leftDays)}</b>`);
     // 首頁最上面的總覽也放一條預算進度，點了捲到下方的預算卡片
     const mini = $("budMini");
@@ -1325,7 +1329,7 @@ function renderBudget(twd) {
   } else {
     head = `<div class="bud-big"><small>本期已花 NT$</small>${fmt(spent)}</div>`;
   }
-  if (income) {
+  if (income && !autoB) {
     const use = proj ?? spent;
     const bal = income - use;
     let t = `${proj !== null ? "預估本期結餘" : "本期結餘"}（${hasSalary ? "實發" : "收入"} ${fmt(income)} − 支出）<b>${fmt(bal)}</b>`;
@@ -1716,6 +1720,7 @@ function budgetHint() {
   const inc = +$("bIncome").value || 0, sv = +$("bSave").value || 0;
   const bits = [];
   if (catSum) bits.push(`分類預算加總 ${fmt(catSum)}`);
+  if (!+$("bTotal").value && !catSum && inc > sv) bits.push(`總預算沒填，會用「收入 − 想存」＝ ${fmt(inc - sv)}`);
   if (inc) bits.push(`收入 − 想存 = 最多可以花 ${fmt(inc - sv)}`);
   if (budAvg.__total) bits.push(`近 3 期平均每期花 ${fmt(budAvg.__total)}`);
   const tot = +$("bTotal").value || catSum;
