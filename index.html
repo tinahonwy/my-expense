@@ -891,9 +891,11 @@
       <p class="cat-hint" style="font-size:14px;color:var(--ink)">開通後，你 Gmail 裡的刷卡通知信會每 15 分鐘自動匯入記帳本，不用寫程式。目前支援國泰世華。</p>
       <ol class="cat-hint" style="padding-left:20px;margin:10px 0 0">
         <li>按下方按鈕，會開啟開通頁面</li>
-        <li>用<b>收刷卡通知信的 Gmail</b> 登入，畫面出現「Google 尚未驗證這個應用程式」時，點「進階」→「前往」→「允許」</li>
-        <li>選擇要匯入多久以前的紀錄，按「開通自動匯入」</li>
+        <li>用 <b id="keyEmail">你現在登入的這個帳號</b> 的 Google 帳號登入，畫面出現「Google 尚未驗證這個應用程式」時，點「進階」→「前往」→「允許」</li>
+        <li>確認開通頁面最上面兩行都是同一個帳號，選擇要匯入多久以前的紀錄，按「開通自動匯入」</li>
       </ol>
+      <div class="info" style="margin-top:10px">開通頁面登入的 Google 帳號，必須跟記帳網頁登入的帳號一樣，不然不能開通。
+        如果這支手機的瀏覽器登入的是別人的 Google 帳號，請用你自己的手機，或在私密／無痕視窗裡打開記帳網頁再開通。不要從 LINE 裡直接點連結。</div>
     </div>
     <div class="dlg-actions">
       <button class="btn-cancel" id="btnKeyClose">關閉</button>
@@ -934,7 +936,7 @@ const firebaseConfig = {
 };
 
 // 刷卡自動匯入服務的網址（Apps Script 部署成網頁應用程式後，把網址貼在這裡）
-const IMPORT_SERVICE_URL = "https://script.google.com/macros/s/AKfycbziYRsVgjpKlHL8jcU-DtVg1LlBNV-om6tYse6lolfFv19NxhLmuEEN2JWBj9RPguRm/exec";
+const IMPORT_SERVICE_URL = "https://script.google.com/macros/s/AKfycbwt8VxnmIEY8qX8csabtFi905fok-Sr2AysTBu_xWn8V57fL4rvzmA_dLQ0GJVdaxjO/exec";
 
 // 台股即時股價服務的網址（把 price-proxy.gs 部署成網頁應用程式後，把結尾是 /exec 的網址貼在引號裡）
 // 留空的話，股票頁會改用你手動填的現價
@@ -2921,6 +2923,7 @@ $("btnLogout").onclick = () => { $("dlgMenu").close(); signOut(auth); };
 $("btnKey").onclick = () => {
   $("dlgMenu").close();
   $("keyText").value = user.refreshToken;
+  $("keyEmail").textContent = user.email || "你現在登入的這個帳號";
   $("btnSvc").classList.toggle("hidden", !IMPORT_SERVICE_URL);
   $("svcOn").classList.toggle("hidden", !IMPORT_SERVICE_URL);
   $("dlgKey").showModal();
