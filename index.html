@@ -605,6 +605,12 @@
   <div class="sec-h" style="margin-top:22px"><span>交易紀錄</span><small>按「編輯」可以修改或刪除</small></div>
   <div class="an-list" id="stTx"></div>
   <div class="st-set">
+    記交易時手續費
+    <select id="stFeeMode" aria-label="記交易時手續費">
+      <option value="zero">預設 0（要記再自己填）</option><option value="auto">自動計算</option>
+    </select>
+  </div>
+  <div class="st-set" style="margin-top:0">
     手續費折扣
     <select id="stDisc" aria-label="手續費折扣">
       <option value="10">無折扣</option><option value="6">6 折</option><option value="5">5 折</option>
@@ -685,7 +691,7 @@
       <div class="field"><label for="sFee">手續費</label><input type="number" id="sFee" inputmode="decimal" step="any" min="0"></div>
       <div class="field" id="sTaxF"><label for="sTax">證交稅</label><input type="number" id="sTax" inputmode="decimal" step="any" min="0"></div>
     </div>
-    <p class="cat-hint" id="sFeeHint">手續費和證交稅會自動算，和券商對帳單不同的話可以直接改。</p>
+    <p class="cat-hint" id="sFeeHint"></p>
     <div class="field"><label for="sNote">備註</label><input id="sNote" placeholder="選填"></div>
     <div class="info" id="sSum"></div>
     <div class="dlg-actions">
@@ -972,7 +978,7 @@ function resetSession() {
   unsub = unsubCats = unsubRules = unsubBudget = unsubStocks = unsubStSet = null;
   txs = []; allTxs = null; cycleCache = {}; clearAn();
   storeRules = {}; CATEGORIES = DEFAULT_CATEGORIES; BUDGET = { ...EMPTY_BUDGET };
-  stockTxs = []; stocksLoaded = false; stockSet = { prices: {}, discount: 10, minFee: 20 };
+  stockTxs = []; stocksLoaded = false; stockSet = { prices: {}, discount: 10, minFee: 20, feeMode: "zero" };
   quotes = {}; quotesAt = ""; quoteErr = "";
   filter = null; region = null; onlyPending = false; editingId = null; stEditingId = null;
   anStart = null; anData = null; searchFrom = null;
@@ -1572,7 +1578,7 @@ $("btnBudSave").onclick = async () => {
 
 // ===== 股票投資 =====
 let stockTxs = [], stocksLoaded = false, unsubStocks = null, unsubStSet = null;
-let stockSet = { prices: {}, discount: 10, minFee: 20 };
+let stockSet = { prices: {}, discount: 10, minFee: 20, feeMode: "zero" };
 let stEditingId = null, stType = "buy", feeTouched = false, taxTouched = false, priceCode = null;
 
 function ensureStocks() {
@@ -1585,7 +1591,7 @@ function ensureStocks() {
   }, err => { $("stSum").innerHTML = `<div class="an-meta">無法讀取：${esc(err.code)}</div>`; });
   unsubStSet = onSnapshot(doc(db, "users", uid, "settings", "stocks"), snap => {
     const d = snap.exists() ? snap.data() : {};
-    stockSet = { prices: d.prices || {}, discount: d.discount ?? 10, minFee: d.minFee ?? 20 };
+    stockSet = { prices: d.prices || {}, discount: d.discount ?? 10, minFee: d.minFee ?? 20, feeMode: d.feeMode || "zero" };
     renderStocks();
   });
 }
@@ -1678,6 +1684,7 @@ function renderStocks() {
   if ($("stocks").classList.contains("hidden")) return;
   $("stDisc").value = String(stockSet.discount);
   $("stMin").value = stockSet.minFee;
+  $("stFeeMode").value = stockSet.feeMode;
   if (!stocksLoaded) { $("stSum").innerHTML = `<div class="an-meta">載入中…</div>`; $("stHold").innerHTML = ""; $("stTx").innerHTML = ""; return; }
   const { H, realized, divs, costs } = calcHoldings();
   renderQuoteBar();
@@ -1774,6 +1781,7 @@ const saveStockSet = async data => {
   catch (err) { toast("儲存失敗：" + err.code); }
 };
 $("stDisc").onchange = () => saveStockSet({ discount: +$("stDisc").value });
+$("stFeeMode").onchange = () => saveStockSet({ feeMode: $("stFeeMode").value });
 $("stMin").onchange = () => saveStockSet({ minFee: Math.max(+$("stMin").value || 0, 0) });
 
 function setStType(t) {
@@ -1784,6 +1792,8 @@ function setStType(t) {
   $("sAmountF").classList.toggle("hidden", !isDiv);
   $("stFeeRow").classList.toggle("hidden", isDiv);
   $("sFeeHint").classList.toggle("hidden", isDiv);
+  $("sFeeHint").textContent = (stockSet.feeMode === "auto" ? "手續費會自動算" : "手續費空白就是 0，要記的話照券商明細填")
+    + (t === "sell" ? "；證交稅會自動算" : "") + "。和券商對帳單不同的話可以直接改。";
   $("sTaxF").classList.toggle("hidden", t !== "sell");
   $("sSharesLbl").textContent = isDiv ? "配股股數（選填）" : "股數";
   calcStock();
@@ -1797,7 +1807,7 @@ function calcStock() {
   const s = +$("sShares").value || 0, p = +$("sPrice").value || 0, amt = s * p;
   const code = $("sCode").value.trim();
   if (stType !== "div") {
-    if (!feeTouched) $("sFee").value = amt > 0 ? sellFee(amt) : "";
+    if (!feeTouched) $("sFee").value = amt > 0 && stockSet.feeMode === "auto" ? sellFee(amt) : "";
     if (!taxTouched) $("sTax").value = stType === "sell" && amt > 0 ? sellTax(code, amt) : "";
   }
   const fee = +$("sFee").value || 0, tax = +$("sTax").value || 0;
