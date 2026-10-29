@@ -1157,7 +1157,10 @@
   <form class="dlg" method="dialog" id="lvForm">
     <div class="dlg-head"><h3 id="lvTitle">記請假</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <div class="field"><span class="flabel">假別</span><div class="cat-chips" id="lvTypeChips" role="radiogroup" aria-label="假別"></div></div>
-    <div class="field"><label for="lvDate">日期（請好幾天的話，填第一天）</label><input type="date" id="lvDate" required></div>
+    <div class="row2">
+      <div class="field"><label for="lvDate">從</label><input type="date" id="lvDate" required></div>
+      <div class="field"><label for="lvEnd">到（只請一天不用改）</label><input type="date" id="lvEnd"></div>
+    </div>
     <div class="field">
       <label for="lvHours">時數</label>
       <div class="chips" id="lvHourChips"><button type="button" data-h="1">1 小時</button><button type="button" data-h="4">半天</button><button type="button" data-h="8">1 天</button><button type="button" data-h="16">2 天</button><button type="button" data-h="24">3 天</button></div>
@@ -1524,6 +1527,15 @@ function leavePayMonth(r) {
   m += +LEAVE.lag || 0;
   while (m > 12) { m -= 12; y++; }
   return `${y}-${pad(m)}`;
+}
+// 日期範圍：9/21（一）～9/24（四）
+const mdw = d => { const x = new Date(d + "T00:00:00"); return `${x.getMonth() + 1}/${x.getDate()}（${WEEK[x.getDay()]}）`; };
+const lvDateLabel = r => r.endDate && r.endDate > r.date ? `${mdw(r.date)}～${mdw(r.endDate)}` : mdw(r.date);
+// 兩個日期之間有幾個上班日（週一到週五）
+function weekdaysBetween(a, b) {
+  let n = 0;
+  for (let d = new Date(a + "T00:00:00"), e = new Date(b + "T00:00:00"); d <= e; d.setDate(d.getDate() + 1)) if (d.getDay() % 6) n++;
+  return n;
 }
 const payMonthLabel = (pm, date) => (pm.slice(0, 4) !== date.slice(0, 4) ? `${pm.slice(0, 4)} 年 ` : "") + `${+pm.slice(5)} 月`;
 function leaveDeductForPay(y, m) {
@@ -2645,7 +2657,7 @@ function renderLeave() {
     return `<button class="item" data-id="${esc(r.id)}">
       <span class="dot" style="background:${lvColor(r.type)}"></span>
       <span style="min-width:0"><div class="store">${esc(t?.name || "已刪除的假別")}・${fmtLv(r.hours)}</div>
-        <div class="sub">${d.getMonth() + 1}/${d.getDate()}（${WEEK[d.getDay()]}）${c.ded ? `・扣在 ${payMonthLabel(leavePayMonth(r), r.date)}薪水${r.payMonth ? "（自訂）" : ""}` : ""}${c.manual ? "・金額自訂" : ""}${c.overH ? `・<span class="uncat">超過天數上限 ${fmtLv(c.overH)}</span>` : ""}${r.note ? "・" + esc(r.note) : ""}</div></span>
+        <div class="sub">${lvDateLabel(r)}${c.ded ? `・扣在 ${payMonthLabel(leavePayMonth(r), r.date)}薪水${r.payMonth ? "（自訂）" : ""}` : ""}${c.manual ? "・金額自訂" : ""}${c.overH ? `・<span class="uncat">超過天數上限 ${fmtLv(c.overH)}</span>` : ""}${r.note ? "・" + esc(r.note) : ""}</div></span>
       <span class="amt-wrap"><span class="amt" style="font-size:18px;${c.ded ? "color:var(--danger)" : ""}">${c.ded ? "−" + fmt(c.ded) : "不扣"}</span></span>
     </button>`;
   }).join("") : `<div class="empty" style="padding:28px">${y} 年還沒有請假紀錄</div>`;
@@ -2697,7 +2709,10 @@ function openLeaveRec(r) {
   $("lvTitle").textContent = r ? "修改請假" : "記請假";
   lvTypeSel = r?.type || LEAVE.types[0]?.id;
   $("lvDate").value = r?.date || ymd(new Date());
+  $("lvEnd").value = r?.endDate || r?.date || ymd(new Date());
+  $("lvEnd").min = $("lvDate").value;
   $("lvHours").value = r?.hours || 8;
+  lvHoursTouched = !!r;
   $("lvNote").value = r?.note || "";
   $("lvDedIn").value = r?.ded ?? "";
   $("lvPayM").value = r?.payMonth || "";
@@ -2708,14 +2723,40 @@ function openLeaveRec(r) {
   $("dlgLeave").showModal();
 }
 $("btnLvAdd").onclick = () => openLeaveRec();
-$("lvHourChips").querySelectorAll("button").forEach(b => b.onclick = () => { $("lvHours").value = b.dataset.h; lvSync(); });
-["lvHours", "lvDate", "lvDedIn"].forEach(id => $(id).addEventListener("input", lvSync));
+$("lvHourChips").querySelectorAll("button").forEach(b => b.onclick = () => {
+  $("lvHours").value = b.dataset.h;
+  lvHoursTouched = true;
+  // 點「2 天」「3 天」時，結束日期跟著往後推（跳過週末）
+  const days = Math.ceil(+b.dataset.h / 8), a = $("lvDate").value;
+  if (a && days >= 1) {
+    const d = new Date(a + "T00:00:00"); let left = days - 1;
+    while (left > 0) { d.setDate(d.getDate() + 1); if (d.getDay() % 6) left--; }
+    $("lvEnd").value = ymd(d);
+  }
+  lvSync();
+});
+["lvDedIn"].forEach(id => $(id).addEventListener("input", lvSync));
+// 改日期範圍時，自動算時數（上班日 × 8）；自己改過時數就不再自動改
+let lvHoursTouched = false;
+function lvDatesChanged() {
+  const a = $("lvDate").value;
+  if (!a) return lvSync();
+  $("lvEnd").min = a;
+  if (!$("lvEnd").value || $("lvEnd").value < a) $("lvEnd").value = a;
+  const n = weekdaysBetween(a, $("lvEnd").value);
+  if (!lvHoursTouched && $("lvEnd").value > a) $("lvHours").value = Math.max(n, 1) * 8;
+  lvSync();
+}
+$("lvDate").addEventListener("change", lvDatesChanged);
+$("lvEnd").addEventListener("change", lvDatesChanged);
+$("lvHours").addEventListener("input", () => { lvHoursTouched = true; lvSync(); });
 $("lvPayM").addEventListener("change", lvSync);
 $("lvPayM").addEventListener("input", lvSync);
 $("lvCancel").onclick = () => $("dlgLeave").close();
 $("lvForm").onsubmit = async e => {
   e.preventDefault();
-  const rec = { id: lvEditId || "lv" + Date.now().toString(36), type: lvTypeSel, date: $("lvDate").value, hours: +$("lvHours").value || 0, note: $("lvNote").value.trim(),
+  const endDate = $("lvEnd").value > $("lvDate").value ? $("lvEnd").value : "";
+  const rec = { id: lvEditId || "lv" + Date.now().toString(36), type: lvTypeSel, date: $("lvDate").value, endDate, hours: +$("lvHours").value || 0, note: $("lvNote").value.trim(),
     payMonth: $("lvPayM").value || "", ded: $("lvDedIn").value === "" ? null : +$("lvDedIn").value };
   if (!rec.type || !rec.date || !rec.hours) return toast("請選假別、日期和時數");
   const records = LEAVE.records.filter(r => r.id !== lvEditId).concat(rec);
@@ -2768,7 +2809,8 @@ function parseLeaveText(text) {
     const words = rest.filter(c => /[一-鿿]/.test(c) && !APPROVE.test(c) && !/^\d/.test(c));
     const name = (words[0] || "").replace(/\s/g, "");
     if (!name) return;
-    rows.push({ name, date, hours, note: words.slice(1).join(" ") });
+    const endDate = dts.length >= 2 ? `${dts[1][1]}-${pad(+dts[1][2])}-${pad(+dts[1][3])}` : "";
+    rows.push({ name, date, endDate: endDate > date ? endDate : "", hours, note: words.slice(1).join(" ") });
   });
   return rows;
 }
@@ -2790,18 +2832,20 @@ function lvImpRender() {
     $("lvImpGo").disabled = true;
     return;
   }
-  const dup = rows.filter(r => { const id = lvTypeIdByName(r.name); return id && LEAVE.records.some(x => x.type === id && x.date === r.date && +x.hours === +r.hours); }).length;
+  const sameRec = r => { const id = lvTypeIdByName(r.name); return id && LEAVE.records.find(x => x.type === id && x.date === r.date && +x.hours === +r.hours); };
+  const dup = rows.filter(r => sameRec(r)).length;
+  const fill = rows.filter(r => { const x = sameRec(r); return x && r.endDate && x.endDate !== r.endDate; }).length;
   const by = {};
   rows.forEach(r => { by[r.name] = (by[r.name] || 0) + r.hours; });
   const opts = `<option value="__new">新增成新的假別（不扣薪，之後可改）</option>` + LEAVE.types.map(t => `<option value="${esc(t.id)}">算成「${esc(t.name)}」</option>`).join("");
   $("lvImpPrev").innerHTML = `<div class="imp-sum">
-    <span>找到 <b>${rows.length}</b> 筆，共 ${fmtLv(rows.reduce((s, r) => s + r.hours, 0))}${dup ? `，其中 ${dup} 筆已經記過、會略過` : ""}</span>
+    <span>找到 <b>${rows.length}</b> 筆，共 ${fmtLv(rows.reduce((s, r) => s + r.hours, 0))}${dup ? `，其中 ${dup} 筆已經記過、會略過` : ""}${fill ? `（會幫 ${fill} 筆補上結束日期）` : ""}</span>
     <div class="chips">${Object.entries(by).map(([n, h]) => `<span>${esc(n)}・${fmtLv(h)}</span>`).join("")}</div>
     ${unknown.map(n => `<label class="imp-map">「${esc(n)}」<select data-n="${esc(n)}">${opts}</select></label>`).join("")}
   </div>`;
   $("lvImpPrev").querySelectorAll("select[data-n]").forEach(sel => { if (keep[sel.dataset.n]) sel.value = keep[sel.dataset.n]; });
-  $("lvImpGo").disabled = rows.length === dup;
-  $("lvImpGo").textContent = `匯入 ${rows.length - dup} 筆`;
+  $("lvImpGo").disabled = rows.length === dup && !fill;
+  $("lvImpGo").textContent = rows.length - dup ? `匯入 ${rows.length - dup} 筆` : `補上結束日期`;
 }
 $("btnLvImport").onclick = () => { $("lvImpText").value = ""; lvImpRender(); $("dlgLvImport").showModal(); };
 $("lvImpText").addEventListener("input", lvImpRender);
@@ -2816,19 +2860,21 @@ $("lvImpGo").onclick = async () => {
     } else map[sel.dataset.n] = sel.value;
   });
   const idOf = n => map[n] || lvTypeIdByName(n);
-  const records = [...LEAVE.records];
-  let added = 0;
+  const records = LEAVE.records.map(x => ({ ...x }));
+  let added = 0, filled = 0;
   lvImp.rows.forEach((r, i) => {
     const type = idOf(r.name);
-    if (!type || records.some(x => x.type === type && x.date === r.date && +x.hours === +r.hours)) return;
-    records.push({ id: "lv" + Date.now().toString(36) + i, type, date: r.date, hours: r.hours, note: r.note });
+    if (!type) return;
+    const old = records.find(x => x.type === type && x.date === r.date && +x.hours === +r.hours);
+    if (old) { if (r.endDate && old.endDate !== r.endDate) { old.endDate = r.endDate; filled++; } return; }
+    records.push({ id: "lv" + Date.now().toString(36) + i, type, date: r.date, endDate: r.endDate, hours: r.hours, note: r.note });
     added++;
   });
   $("lvImpGo").disabled = true;
   try {
     await saveLeave({ types, records });
     $("dlgLvImport").close();
-    toast(`已匯入 ${added} 筆`);
+    toast([added ? `已匯入 ${added} 筆` : "", filled ? `補上 ${filled} 筆結束日期` : ""].filter(Boolean).join("，") || "沒有新的資料");
   } catch (err) { toast("匯入失敗：" + err.code); $("lvImpGo").disabled = false; }
 };
 
