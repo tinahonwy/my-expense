@@ -743,6 +743,20 @@
   .imp-sum .chips span { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 14px; background: var(--bg); font-size: 13px; }
   .imp-map { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; padding: 8px 10px; background: var(--gold-soft); border-radius: 10px; font-size: 13px; }
   .imp-map select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--paper); min-width: 0; }
+
+  /* 首頁概覽 */
+  .ov { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .ov-tile { display: grid; align-content: start; gap: 2px; min-height: 86px; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--paper); text-align: left; position: relative; }
+  .ov-tile:hover { background: var(--accent-soft); }
+  .ov-tile:active { transform: scale(.98); }
+  .ov-tile .k { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+  .ov-tile .k i { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--accent)); }
+  .ov-tile .v { font-family: var(--num); font-size: 24px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .ov-tile .v small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+  .ov-tile .v.neg { color: var(--danger); }
+  .ov-tile .s { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ov-tile.wide { grid-column: 1 / -1; min-height: 0; }
+  .ov-tile::after { content: "›"; position: absolute; right: 12px; top: 10px; color: var(--muted); font-size: 16px; }
 </style>
 </head>
 <body>
@@ -774,6 +788,8 @@
     <div>用下方的分頁切換<b>首頁、預算、資產</b>；中間的 <b>＋</b> 隨時記一筆。固定支出、店家排行和設定在「更多」。</div>
     <button class="tip-x" id="tipX">知道了</button>
   </div>
+
+  <section class="ov hidden" id="overview" aria-label="概覽"></section>
 
   <div class="searchbar hidden" id="searchBar">
     <input id="searchInput" type="search" placeholder="搜尋商店、備註或分類，例如：UNIQLO" autocomplete="off">
@@ -1614,6 +1630,7 @@ function resetSession() {
   unsub = unsubCats = unsubRules = unsubBudget = unsubStocks = unsubStSet = unsubAssets = unsubLeave = null;
   LEAVE = { types: DEFAULT_LEAVE_TYPES, lag: 1, records: [] };
   ASSETS = { base: null, salary: {}, payroll: {} };
+  OV.assets = null;
   txs = []; allTxs = null; cycleCache = {}; clearAn();
   storeRules = {}; CATEGORIES = DEFAULT_CATEGORIES; BUDGET = { ...EMPTY_BUDGET };
   stockTxs = []; stocksLoaded = false; stockSet = { prices: {}, discount: 10, minFee: 20, feeMode: "zero" };
@@ -1679,6 +1696,8 @@ onAuthStateChanged(auth, async u => {
       setCycleDay(pref.exists() ? pref.data().cycleDay : 1);
     } catch (e) { setCycleDay(1); }
     subscribe();
+    ensureStocks();                 // 首頁概覽要顯示股票
+    refreshQuotes(false);
   }
 });
 
@@ -1833,10 +1852,14 @@ function render() {
     $("list").innerHTML = `<div class="empty">還沒有任何消費。<br><button class="btn-primary" id="emptyAdd">記一筆</button></div>`;
     $("emptyAdd").onclick = () => openTx();
     renderTrend();
+    renderOverview();
+    scheduleAssets();
     return;
   }
   renderList(shown, txs, false);
   renderTrend();
+  renderOverview();
+  scheduleAssets();
 }
 
 // ===== 本期預算 =====
@@ -1994,7 +2017,7 @@ function setSearchMode(on, initial = "") {
   $("searchBar").classList.toggle("hidden", !on);
   $("searchSum").classList.toggle("hidden", !on);
   $("receipt").classList.toggle("hidden", on);
-  if (on) { $("trend").classList.add("hidden"); $("budCard").classList.add("hidden"); }
+  if (on) { $("trend").classList.add("hidden"); $("budCard").classList.add("hidden"); $("overview").classList.add("hidden"); }
   document.querySelector(".month").style.visibility = on ? "hidden" : "";
   $("btnSearch").classList.toggle("hidden", on);
   $("tipCard").classList.toggle("hidden", on || tipHidden);
@@ -2206,6 +2229,60 @@ async function openSubs() {
 }
 $("btnSubs").onclick = openSubs;
 
+// ===== 首頁概覽：資產、股票、發薪、待收、請假 =====
+const OV = { assets: null };
+function renderOverview() {
+  const el = $("overview");
+  if (!user || searching) return el.classList.add("hidden");
+  const tiles = [];
+  const tile = (go, k, v, sub, opt = {}) => tiles.push(`<button type="button" class="ov-tile ${opt.wide ? "wide" : ""}" data-go="${go}" style="${opt.c ? `--c:${opt.c}` : ""}">
+    <span class="k"><i></i>${k}</span><span class="v ${opt.neg ? "neg" : ""}">${v}</span>${sub ? `<span class="s">${sub}</span>` : ""}</button>`);
+  const A = OV.assets;
+  if (A) {
+    tile("assets", "總資產", fmt(A.total), "含股票和別人欠的錢", { c: "#146C6B" });
+    tile("assets", "能用的現金", fmt(A.cash), A.cash < 0 ? `${A.nm}/1 發薪後約 ${fmt(A.afterPay)}` : "已扣掉要繳的卡費", { c: "#2E8B57", neg: A.cash < 0 });
+  } else if (ASSETS.base === null) {
+    tile("assets", "資產", "—", "輸入一次存款就能開始算", { c: "#146C6B" });
+  }
+  // 下次發薪
+  const t = new Date(), ny = t.getMonth() === 11 ? t.getFullYear() + 1 : t.getFullYear(), nm = t.getMonth() === 11 ? 1 : t.getMonth() + 2;
+  const days = Math.round((new Date(ny, nm - 1, 1) - new Date(t.getFullYear(), t.getMonth(), t.getDate())) / 864e5);
+  const pay = salaryOf(ny, nm);
+  if (pay > 0) tile("pay", "下次發薪", `${fmt(pay)}`, `${nm}/1・還有 ${days} 天`, { c: "#D4A21E" });
+  // 股票
+  if (stocksLoaded) {
+    const { H } = calcHoldings();
+    const holds = Object.values(H).filter(h => h.shares > 0);
+    if (holds.length) {
+      const st = stockValue();
+      let day = 0, base = 0;
+      holds.forEach(h => { const q = quotes[h.code]; if (q?.change != null) { day += h.shares * q.change; base += h.shares * (q.price - q.change); } });
+      tile("stocks", "股票", fmt(st.v), base ? `今日 <span class="${upDown(day)}">${signed(day)}（${pctTxt(day / base * 100)}）</span>` : `${holds.length} 檔`, { c: "#C62828" });
+    }
+  }
+  // 別人欠我的
+  if (A?.recv > 0) tile("assets", "等別人還的錢", fmt(A.recv), Object.entries(A.byWho).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${esc(k)} ${fmt(v)}`).join("、"), { c: "#C2417A" });
+  // 請假
+  const y = String(t.getFullYear());
+  const recs = (LEAVE.records || []).filter(r => r.date.startsWith(y));
+  if (recs.length) {
+    const calc = leaveCalc(), h = recs.reduce((s, r) => s + (+r.hours || 0), 0), ded = recs.reduce((s, r) => s + (calc[r.id]?.ded || 0), 0);
+    const annual = LEAVE.types.find(x => x.id === "annual");
+    const aUsed = recs.filter(r => r.type === "annual").reduce((s, r) => s + (+r.hours || 0), 0);
+    const sub = [ded ? (LEAVE.lag === "fixed" ? `年底扣 ${fmt(ded)}` : `共扣 ${fmt(ded)}`) : "不扣薪", annual?.limit ? `${annual.name}剩 ${fmtLv(annual.limit * 8 - aUsed)}` : ""].filter(Boolean).join("・");
+    tile("leave", `${y} 請假`, fmtLv(h).replace(" 天", "<small>天</small>").replace(" 小時", "<small>小時</small>"), sub, { c: "#7A5BC2" });
+  }
+  el.innerHTML = tiles.join("");
+  el.classList.toggle("hidden", !tiles.length);
+  el.querySelectorAll(".ov-tile").forEach(b => b.onclick = () => {
+    const g = b.dataset.go;
+    if (g === "stocks") openStocks();
+    else if (g === "leave") openLeave();
+    else if (g === "pay") { openAssets(); setTimeout(() => $("asSalBox").scrollIntoView({ block: "start", behavior: "smooth" }), 300); }
+    else openAssets();
+  });
+}
+
 // ===== 資產總覽 =====
 // 做法：你輸入某一天的「存款、還沒繳的卡費、別人欠你的錢」當起點，
 // 之後自動 ＋ 每月 1 號薪水、− 固定支出、− 記到的消費（刷卡的算欠款，所以一樣扣），再加上股票市值
@@ -2243,7 +2320,7 @@ function stockValue() {
 }
 let assetsTimer;
 function scheduleAssets() {
-  if (!user || $("assets").classList.contains("hidden")) return;
+  if (!user) return;                                // 資產頁沒打開也要算，首頁概覽會用到
   clearTimeout(assetsTimer);
   assetsTimer = setTimeout(renderAssets, 200);
 }
@@ -2258,14 +2335,15 @@ $("btnAssets").onclick = openAssets;
 
 let assetsToken = 0;
 async function renderAssets() {
-  if ($("assets").classList.contains("hidden")) return;
+  if (!user) return;
+  const visible = !$("assets").classList.contains("hidden");
   const token = ++assetsToken;
   const today = ymd(new Date());
   const base = ASSETS.base;
   $("asCalcBox").classList.toggle("hidden", !base);
-  renderSalaryRows(base, today);
-  renderSavings(token);
+  if (visible) { renderSalaryRows(base, today); renderSavings(token); }
   if (!base) {
+    OV.assets = null; renderOverview();
     $("asSum").innerHTML = `
       <div class="an-meta">先輸入一次現在的存款，網頁就會開始幫你算總資產。</div>
       <p class="cat-hint" style="margin:0">之後每月 1 號會自動加上薪水，扣掉固定支出和你記到的消費。股票會自動算市值。</p>
@@ -2327,6 +2405,8 @@ async function renderAssets() {
   const nt = new Date(), ny = nt.getMonth() === 11 ? nt.getFullYear() + 1 : nt.getFullYear(), nm = nt.getMonth() === 11 ? 1 : nt.getMonth() + 2;
   const afterPay = cash + salaryOf(ny, nm) - fixedFor(cycleOf(ny, nm, 1));
   const bd = base.date.slice(5).replace("-", "/").replace(/^0/, "");
+  OV.assets = { cash, recv, byWho, total, afterPay, nm };
+  renderOverview();
   $("asSum").innerHTML = `
     <div>
       <div class="an-meta">總資產（估計到今天）</div>
