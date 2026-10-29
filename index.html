@@ -738,6 +738,11 @@
   .lv-type label { font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
   .lv-type input, .lv-type select { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--paper); min-width: 0; width: 100%; font-size: 15px; }
   .lv-type .del { width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--danger-soft); color: var(--danger); font-size: 16px; }
+
+  .imp-sum { display: grid; gap: 8px; font-size: 14px; }
+  .imp-sum .chips span { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 14px; background: var(--bg); font-size: 13px; }
+  .imp-map { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; padding: 8px 10px; background: var(--gold-soft); border-radius: 10px; font-size: 13px; }
+  .imp-map select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--paper); min-width: 0; }
 </style>
 </head>
 <body>
@@ -958,6 +963,7 @@
     <h2>請假紀錄</h2>
     <button class="btn-primary" id="btnLvAdd">＋ 記請假</button>
   </div>
+  <button class="btn-ghost" id="btnLvImport" style="width:100%;margin-bottom:12px;background:var(--paper)">從公司系統貼上匯入</button>
   <div class="cycle-nav">
     <button id="lvPrev" aria-label="前一年">‹</button>
     <span id="lvYear"></span>
@@ -1134,7 +1140,7 @@
     <div class="field">
       <label for="lvHours">時數</label>
       <div class="chips" id="lvHourChips"><button type="button" data-h="1">1 小時</button><button type="button" data-h="4">半天</button><button type="button" data-h="8">1 天</button><button type="button" data-h="16">2 天</button><button type="button" data-h="24">3 天</button></div>
-      <input class="num-in" type="number" id="lvHours" inputmode="decimal" step="0.5" min="0.5" required placeholder="小時" style="margin-top:8px">
+      <input class="num-in" type="number" id="lvHours" inputmode="decimal" step="0.25" min="0.25" required placeholder="小時" style="margin-top:8px">
       <small>1 天 = 8 小時</small>
     </div>
     <div class="field"><label for="lvNote">備註</label><input id="lvNote" placeholder="選填，例如看醫生"></div>
@@ -1145,6 +1151,19 @@
       <button type="submit" class="btn-primary" id="lvSave">儲存</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="dlgLvImport">
+  <div class="dlg">
+    <div class="dlg-head"><h3>貼上匯入請假</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+    <p class="cat-hint" style="margin:0">到公司的請假系統，把請假明細整張表選起來複製，貼到下面。每一行要有假別、日期和時數，有沒有標題列都可以。「不准」的會自動略過，已經記過的也不會重複匯入。</p>
+    <textarea class="notes" id="lvImpText" style="min-height:140px;font-size:13px" placeholder="例如：&#10;休假	2026/10/16 15:30:00	2026/10/16 17:00:00	1.50		准&#10;傷病假	2026/10/02 13:00:00	2026/10/02 17:00:00	4.00	肚子痛	准"></textarea>
+    <div id="lvImpPrev"></div>
+    <div class="dlg-actions sticky-act">
+      <button class="btn-cancel" id="lvImpCancel">取消</button>
+      <button class="btn-primary" id="lvImpGo" disabled>匯入</button>
+    </div>
+  </div>
 </dialog>
 
 <dialog id="dlgLvTypes">
@@ -1430,18 +1449,21 @@ function incomeFromSettings(c) {
 // ===== 請假 =====
 // 假別：pay＝上限內給薪比例（1 不扣、0.5 扣一半、0 全扣）；limit＝每年天數；group＝跟哪個假別合併計算天數；overPay＝超過上限後的給薪比例
 const DEFAULT_LEAVE_TYPES = [
-  { id: "annual", name: "特休", pay: 1, limit: null, group: "", overPay: 0 },
-  { id: "sick", name: "病假", pay: 0.5, limit: 30, group: "", overPay: 0 },
+  { id: "annual", name: "休假", pay: 1, limit: null, group: "", overPay: 0 },          // 特休
+  { id: "comp", name: "補休", pay: 1, limit: null, group: "", overPay: 0 },
+  { id: "sick", name: "傷病假", pay: 0.5, limit: 30, group: "", overPay: 0 },
   { id: "period", name: "生理假", pay: 0.5, limit: null, group: "sick", overPay: 0 },
   { id: "personal", name: "事假", pay: 0, limit: 14, group: "", overPay: 0 },
   { id: "official", name: "公假", pay: 1, limit: null, group: "", overPay: 0 },
 ];
+// 公司系統常見的其他叫法，匯入時自動對應
+const LEAVE_ALIASES = { 特休: "annual", 特別休假: "annual", 年假: "annual", 病假: "sick", 普通傷病假: "sick", 補假: "comp" };
 let LEAVE = { types: DEFAULT_LEAVE_TYPES, lag: 1, records: [] }, unsubLeave = null;
 const LEAVE_COLORS = ["#2E8B57", "#C2417A", "#7A5BC2", "#E07A2E", "#2F6FB3", "#D4A21E", "#3A9E9A", "#9C6B3F", "#5B7C8A"];
 const lvType = id => LEAVE.types.find(t => t.id === id);
 const lvColor = id => { const i = LEAVE.types.findIndex(t => t.id === id); return LEAVE_COLORS[(i < 0 ? 8 : i) % LEAVE_COLORS.length]; };
 const lvQuotaId = t => (t?.group && lvType(t.group)) ? t.group : t?.id;          // 合併計算時，用主要假別的天數
-const fmtLv = h => { h = +h || 0; const d = Math.floor(h / 8), r = Math.round((h % 8) * 10) / 10; return d && r ? `${d} 天 ${r} 小時` : d ? `${d} 天` : `${r} 小時`; };
+const fmtLv = h => { h = +h || 0; const d = Math.floor(h / 8), r = Math.round((h % 8) * 100) / 100; return d && r ? `${d} 天 ${r} 小時` : d ? `${d} 天` : `${r} 小時`; };
 const hourlyWage = () => (+BUDGET.salary?.gross || +BUDGET.income || 0) / 30 / 8;
 // 依日期順序算每一筆請假扣多少錢（同一年、同一個天數額度累計）
 function leaveCalc(records = LEAVE.records) {
@@ -2581,6 +2603,94 @@ $("lvDel").onclick = async () => {
   if (!lvEditId || !confirm("確定要刪除這筆請假嗎？")) return;
   try { await saveLeave({ records: LEAVE.records.filter(r => r.id !== lvEditId) }); $("dlgLeave").close(); toast("已刪除"); }
   catch (err) { toast("刪除失敗：" + err.code); }
+};
+
+// ===== 從公司系統貼上匯入 =====
+// 每一行：找日期、時數、假別名稱，其他欄位當備註；「不准／駁回／取消」的略過
+let lvImp = { rows: [], unknown: [] };
+function parseLeaveText(text) {
+  const rows = [];
+  text.split(/\r?\n/).forEach(line => {
+    if (!line.trim()) return;
+    const cells = line.split(/\t|\s{2,}|,(?=\S)/).map(c => c.trim()).filter((c, i, a) => c || (i > 0 && i < a.length - 1));
+    const dm = line.match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+    if (!dm) return;                                   // 標題列或沒有日期的行
+    if (/不准|駁回|退回|取消|未核准/.test(line)) return;
+    const date = `${dm[1]}-${pad(+dm[2])}-${pad(+dm[3])}`;
+    // 時數：不含日期、時間的純數字欄位，取最後一個
+    const nums = cells.filter(c => /^\d+(\.\d+)?$/.test(c) && !/^\d{4}$/.test(c));
+    let hours = nums.length ? +nums[nums.length - 1] : NaN;
+    if (!(hours > 0)) {                               // 沒有時數欄：用「天」換算
+      const dd = line.match(/(\d+(?:\.\d+)?)\s*天/); if (dd) hours = +dd[1] * 8;
+    }
+    if (!(hours > 0)) return;
+    const name = (cells.find(c => /[一-鿿]/.test(c) && !/准/.test(c)) || "").replace(/\s/g, "");
+    if (!name) return;
+    // 事由：時數後面那一欄（如果是中文、不是准不准）
+    const hi = cells.findIndex(c => c === nums[nums.length - 1]);
+    const note = cells.slice(hi + 1).find(c => c && !/^(准|核准|同意|已核准)$/.test(c)) || "";
+    rows.push({ name, date, hours, note });
+  });
+  return rows;
+}
+function lvTypeIdByName(name) {
+  const t = LEAVE.types.find(x => x.name === name);
+  if (t) return t.id;
+  const a = LEAVE_ALIASES[name];
+  return a && lvType(a) ? a : null;
+}
+function lvImpRender() {
+  const rows = parseLeaveText($("lvImpText").value);
+  const names = [...new Set(rows.map(r => r.name))];
+  const unknown = names.filter(n => !lvTypeIdByName(n));
+  const keep = {};                                   // 保留使用者已經選好的對應
+  $("lvImpPrev").querySelectorAll("select[data-n]").forEach(sel => keep[sel.dataset.n] = sel.value);
+  lvImp = { rows, unknown };
+  if (!rows.length) {
+    $("lvImpPrev").innerHTML = $("lvImpText").value.trim() ? `<p class="uncat" style="margin:0;font-size:13px">找不到請假資料。每一行要有日期（例如 2026/10/16）和時數。</p>` : "";
+    $("lvImpGo").disabled = true;
+    return;
+  }
+  const dup = rows.filter(r => { const id = lvTypeIdByName(r.name); return id && LEAVE.records.some(x => x.type === id && x.date === r.date && +x.hours === +r.hours); }).length;
+  const by = {};
+  rows.forEach(r => { by[r.name] = (by[r.name] || 0) + r.hours; });
+  const opts = `<option value="__new">新增成新的假別（不扣薪，之後可改）</option>` + LEAVE.types.map(t => `<option value="${esc(t.id)}">算成「${esc(t.name)}」</option>`).join("");
+  $("lvImpPrev").innerHTML = `<div class="imp-sum">
+    <span>找到 <b>${rows.length}</b> 筆，共 ${fmtLv(rows.reduce((s, r) => s + r.hours, 0))}${dup ? `，其中 ${dup} 筆已經記過、會略過` : ""}</span>
+    <div class="chips">${Object.entries(by).map(([n, h]) => `<span>${esc(n)}・${fmtLv(h)}</span>`).join("")}</div>
+    ${unknown.map(n => `<label class="imp-map">「${esc(n)}」<select data-n="${esc(n)}">${opts}</select></label>`).join("")}
+  </div>`;
+  $("lvImpPrev").querySelectorAll("select[data-n]").forEach(sel => { if (keep[sel.dataset.n]) sel.value = keep[sel.dataset.n]; });
+  $("lvImpGo").disabled = rows.length === dup;
+  $("lvImpGo").textContent = `匯入 ${rows.length - dup} 筆`;
+}
+$("btnLvImport").onclick = () => { $("lvImpText").value = ""; lvImpRender(); $("dlgLvImport").showModal(); };
+$("lvImpText").addEventListener("input", lvImpRender);
+$("lvImpCancel").onclick = () => $("dlgLvImport").close();
+$("lvImpGo").onclick = async () => {
+  const types = [...LEAVE.types];
+  const map = {};
+  $("lvImpPrev").querySelectorAll("select[data-n]").forEach(sel => {
+    if (sel.value === "__new") {
+      const t = { id: "t" + Date.now().toString(36) + types.length, name: sel.dataset.n, pay: 1, limit: null, group: "", overPay: 0 };
+      types.push(t); map[sel.dataset.n] = t.id;
+    } else map[sel.dataset.n] = sel.value;
+  });
+  const idOf = n => map[n] || lvTypeIdByName(n);
+  const records = [...LEAVE.records];
+  let added = 0;
+  lvImp.rows.forEach((r, i) => {
+    const type = idOf(r.name);
+    if (!type || records.some(x => x.type === type && x.date === r.date && +x.hours === +r.hours)) return;
+    records.push({ id: "lv" + Date.now().toString(36) + i, type, date: r.date, hours: r.hours, note: r.note });
+    added++;
+  });
+  $("lvImpGo").disabled = true;
+  try {
+    await saveLeave({ types, records });
+    $("dlgLvImport").close();
+    toast(`已匯入 ${added} 筆`);
+  } catch (err) { toast("匯入失敗：" + err.code); $("lvImpGo").disabled = false; }
 };
 
 // 編輯假別
