@@ -757,6 +757,17 @@
   .ov-tile .s { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ov-tile.wide { grid-column: 1 / -1; min-height: 0; }
   .ov-tile::after { content: "›"; position: absolute; right: 12px; top: 10px; color: var(--muted); font-size: 16px; }
+
+  .q-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--bg); border-radius: 12px; }
+  .q-row .nm { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+  .q-row .nm i { width: 8px; height: 8px; border-radius: 50%; }
+  .q-in { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .q-in input { width: 48px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); text-align: right; font-family: var(--num); font-size: 17px; -moz-appearance: textfield; appearance: textfield; }
+  .q-in input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .q-left { text-align: right; font-size: 12px; color: var(--muted); line-height: 1.3; min-width: 64px; }
+  .q-left b { display: block; font-family: var(--num); font-size: 16px; color: var(--ink); }
+  .q-left.over b { color: var(--danger); }
+  .lv-warn { background: var(--danger-soft); color: var(--danger); border-radius: 10px; padding: 8px 10px; margin: -2px -4px 8px; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -984,6 +995,11 @@
     <button id="lvPrev" aria-label="前一年">‹</button>
     <span id="lvYear"></span>
     <button id="lvNext" aria-label="後一年">›</button>
+  </div>
+  <div class="an-box" id="lvQuota">
+    <p class="sec-title" style="margin:0">今年的額度</p>
+    <p class="cat-hint" style="margin:0">填公司給你的總時數，下面記的請假會自動扣掉。空白＝不限。</p>
+    <div id="lvQuotaRows" class="ded-list"></div>
   </div>
   <div class="lv-cards" id="lvCards"></div>
   <div class="sec-h" style="margin-top:18px"><span>請假明細</span><small>點一筆可以修改或刪除</small></div>
@@ -1493,6 +1509,9 @@ let LEAVE = { types: DEFAULT_LEAVE_TYPES, lag: 1, records: [] }, unsubLeave = nu
 const LEAVE_COLORS = ["#2E8B57", "#C2417A", "#7A5BC2", "#E07A2E", "#2F6FB3", "#D4A21E", "#3A9E9A", "#9C6B3F", "#5B7C8A"];
 const lvType = id => LEAVE.types.find(t => t.id === id);
 const lvColor = id => { const i = LEAVE.types.findIndex(t => t.id === id); return LEAVE_COLORS[(i < 0 ? 8 : i) % LEAVE_COLORS.length]; };
+// 額度（小時）：limitH 優先，舊資料用 limit（天）
+const capOf = t => t?.limitH != null && t.limitH !== "" ? +t.limitH : (t?.limit != null && t.limit !== "" ? +t.limit * 8 : null);
+const capLabel = h => fmtLv(h);
 const lvQuotaId = t => (t?.group && lvType(t.group)) ? t.group : t?.id;          // 合併計算時，用主要假別的天數
 const fmtLv = h => { h = +h || 0; const d = Math.floor(h / 8), r = Math.round((h % 8) * 100) / 100; return d && r ? `${d} 天 ${r} 小時` : d ? `${d} 天` : `${r} 小時`; };
 const hourlyWage = () => (+BUDGET.salary?.gross || +BUDGET.income || 0) / 30 / 8;
@@ -1505,7 +1524,7 @@ function leaveCalc(records = LEAVE.records) {
     const q = lvQuotaId(t), lead = lvType(q) || t;
     const key = r.date.slice(0, 4) + "|" + q;
     const before = used[key] || 0, h = +r.hours || 0;
-    const capH = lead.limit ? +lead.limit * 8 : Infinity;
+    const capH = capOf(lead) ?? Infinity;
     const inH = Math.max(0, Math.min(h, capH - before)), overH = h - inH;
     used[key] = before + h;
     const pay = t.pay == null || isNaN(+t.pay) ? 1 : +t.pay, over = lead.overPay == null || isNaN(+lead.overPay) ? 0 : +lead.overPay;
@@ -2281,7 +2300,7 @@ function renderOverview() {
     const calc = leaveCalc(), h = recs.reduce((s, r) => s + (+r.hours || 0), 0), ded = recs.reduce((s, r) => s + (calc[r.id]?.ded || 0), 0);
     const annual = LEAVE.types.find(x => x.id === "annual");
     const aUsed = recs.filter(r => r.type === "annual").reduce((s, r) => s + (+r.hours || 0), 0);
-    const sub = [ded ? (LEAVE.lag === "fixed" ? `年底扣 ${fmt(ded)}` : `共扣 ${fmt(ded)}`) : "不扣薪", annual?.limit ? `${annual.name}剩 ${fmtLv(annual.limit * 8 - aUsed)}` : ""].filter(Boolean).join("・");
+    const sub = [ded ? (LEAVE.lag === "fixed" ? `年底扣 ${fmt(ded)}` : `共扣 ${fmt(ded)}`) : "不扣薪", capOf(annual) != null ? `${annual.name}剩 ${fmtLv(Math.max(capOf(annual) - aUsed, 0))}` : ""].filter(Boolean).join("・");
     tile("leave", `${y} 請假`, fmtLv(h).replace(" 天", "<small>天</small>").replace(" 小時", "<small>小時</small>"), sub, { c: "#7A5BC2" });
   }
   el.innerHTML = tiles.join("");
@@ -2622,6 +2641,46 @@ function openLeave() {
 $("btnLeave").onclick = openLeave;
 $("lvPrev").onclick = () => { lvYearSel--; renderLeave(); };
 $("lvNext").onclick = () => { lvYearSel++; renderLeave(); };
+// 今年的額度：預設列出休假（特休）和補休
+const QUOTA_TYPES = ["annual", "comp"];
+function renderQuota(y, quotaUsed) {
+  const types = LEAVE.types.filter(t => QUOTA_TYPES.includes(t.id) || (capOf(t) != null && +t.pay === 1 && !t.group));
+  $("lvQuota").classList.toggle("hidden", !types.length);
+  const leftHTML = t => {
+    const cap = capOf(t), used = quotaUsed[t.id] || 0, left = cap != null ? cap - used : null;
+    return { cls: left != null && left < 0 ? "over" : "", html: left == null ? `已請<b>${fmtLv(used)}</b>` : left < 0 ? `超過<b>${fmtLv(-left)}</b>` : `還剩<b>${fmtLv(left)}</b>` };
+  };
+  const split = t => { const cap = capOf(t); return cap == null ? ["", ""] : [Math.floor(cap / 8), Math.round((cap - Math.floor(cap / 8) * 8) * 100) / 100 || ""]; };
+  // 假別沒變的話只更新數字，不重畫輸入框（不然正在輸入的欄位會被換掉）
+  const ids = types.map(t => t.id).join("|");
+  if ($("lvQuotaRows").dataset.ids === ids) {
+    types.forEach(t => {
+      const row = $("lvQuotaRows").querySelector(`[data-id="${CSS.escape(t.id)}"]`);
+      const l = leftHTML(t), [d, h] = split(t);
+      row.querySelector(".q-left").className = "q-left " + l.cls;
+      row.querySelector(".q-left").innerHTML = l.html;
+      const qd = row.querySelector(".q-d"), qh = row.querySelector(".q-h");
+      if (document.activeElement !== qd && document.activeElement !== qh) { qd.value = d; qh.value = h; }
+    });
+    return;
+  }
+  $("lvQuotaRows").dataset.ids = ids;
+  $("lvQuotaRows").innerHTML = types.map(t => {
+    const l = leftHTML(t), [d, h] = split(t);
+    return `<div class="q-row" data-id="${esc(t.id)}">
+      <span class="nm"><i style="background:${lvColor(t.id)}"></i>${esc(t.name)}</span>
+      <span class="q-in"><input type="number" class="q-d" inputmode="numeric" min="0" placeholder="—" value="${d}" aria-label="${esc(t.name)}天數">天
+        <input type="number" class="q-h" inputmode="decimal" step="0.25" min="0" max="7.75" placeholder="0" value="${h}" aria-label="${esc(t.name)}小時">小時</span>
+      <span class="q-left ${l.cls}">${l.html}</span>
+    </div>`;
+  }).join("");
+  $("lvQuotaRows").querySelectorAll(".q-row").forEach(row => row.querySelectorAll("input").forEach(i => i.onchange = () => {
+    const dv = row.querySelector(".q-d").value, hv = row.querySelector(".q-h").value;
+    const limitH = dv === "" && hv === "" ? null : (+dv || 0) * 8 + (+hv || 0);
+    const types = LEAVE.types.map(t => t.id === row.dataset.id ? { ...t, limit: null, limitH } : t);
+    saveLeave({ types }).then(() => toast("額度已更新")).catch(e => toast("儲存失敗：" + e.code));
+  }));
+}
 function renderLeave() {
   const y = String(lvYearSel);
   $("lvYear").innerHTML = `${y} 年<small>1/1 – 12/31</small>`;
@@ -2637,15 +2696,16 @@ function renderLeave() {
   const usedBy = {}, quotaUsed = {};
   recs.forEach(r => { usedBy[r.type] = (usedBy[r.type] || 0) + (+r.hours || 0); const q = lvQuotaId(lvType(r.type) || { id: r.type }); quotaUsed[q] = (quotaUsed[q] || 0) + (+r.hours || 0); });
   const totalDed = recs.reduce((s, r) => s + (calc[r.id]?.ded || 0), 0);
+  renderQuota(y, quotaUsed);
   const PAY = p => +p === 1 ? "不扣薪" : +p === 0.5 ? "扣一半薪水" : +p === 0 ? "全扣" : `給薪 ${Math.round(p * 100)}%`;
   $("lvCards").innerHTML = LEAVE.types.map(t => {
     const q = lvQuotaId(t), lead = lvType(q) || t, used = usedBy[t.id] || 0;
-    const cap = lead.limit ? +lead.limit * 8 : null, qUsed = quotaUsed[q] || 0;
+    const cap = capOf(lead), qUsed = quotaUsed[q] || 0;
     const shared = q !== t.id;
     return `<div class="lv-card" style="--c:${lvColor(t.id)}">
       <span class="nm">${esc(t.name)}</span>
       <span class="big">${used ? fmtLv(used).replace(/(\d+(?:\.\d+)?)/g, "$1").replace(" 天", "<small>天</small>").replace(" 小時", "<small>小時</small>") : "0<small>天</small>"}</span>
-      <span class="sub">${PAY(t.pay)}${cap ? `・${shared ? `和${esc(lead.name)}合計` : ""}一年 ${lead.limit} 天` : ""}</span>
+      <span class="sub">${PAY(t.pay)}${cap ? `・${shared ? `和${esc(lead.name)}合計` : ""}一年 ${capLabel(cap)}` : ""}</span>
       ${cap ? `<span class="sub">${qUsed >= cap ? `<span class="uncat">已用完${qUsed > cap ? `，超過 ${fmtLv(qUsed - cap)}` : ""}</span>` : `還剩 <b>${fmtLv(cap - qUsed)}</b>`}</span>
       <div class="prog"><span style="width:${Math.min(qUsed / cap * 100, 100).toFixed(1)}%"></span></div>` : ""}
     </div>`;
@@ -2700,7 +2760,8 @@ function lvSync() {
   $("lvMoreSum").textContent = [$("lvPayM").value ? `改到 ${payMonthLabel($("lvPayM").value, date)}` : "", $("lvDedIn").value !== "" ? `扣 ${fmt(+$("lvDedIn").value)}` : ""].filter(Boolean).join("、");
   const pm = $("lvPayM").value || autoPM;
   let txt = c.ded ? `這次會扣 <b>${fmt(c.ded)}</b> 元${c.manual ? "（你填的金額）" : ""}，扣在 ${payMonthLabel(pm, date)}的薪水` : "這次不會扣薪";
-  if (c.capH !== Infinity) txt += `。${lead.name}${lead.id !== t.id ? "（合併）" : ""}今年到這次為止用了 ${fmtLv(c.usedAfter)}，上限 ${lead.limit} 天${c.overH ? `，<span class="uncat">其中 ${fmtLv(c.overH)} 超過上限</span>` : ""}`;
+  if (c.capH !== Infinity) txt += `。${lead.name}${lead.id !== t.id ? "（合併）" : ""}今年到這次為止用了 ${fmtLv(c.usedAfter)}，額度 ${capLabel(c.capH)}${c.overH ? `` : `，還剩 ${fmtLv(c.capH - c.usedAfter)}`}`;
+  if (c.overH) txt = `<div class="lv-warn">⚠ 超過${esc(lead.name)}額度 <b>${fmtLv(c.overH)}</b>（今年額度 ${capLabel(c.capH)}，加上這次共 ${fmtLv(c.usedAfter)}）。${+t.pay === 1 ? "超過的部分可能要改請其他假，或會被扣薪。" : ""}</div>` + txt;
   if (c.ded && !c.manual && !hourlyWage()) txt = "要先到「預算規劃」填本薪，才算得出扣多少，或直接填實際扣多少";
   $("lvCalc").innerHTML = txt;
 }
@@ -2759,6 +2820,11 @@ $("lvForm").onsubmit = async e => {
   const rec = { id: lvEditId || "lv" + Date.now().toString(36), type: lvTypeSel, date: $("lvDate").value, endDate, hours: +$("lvHours").value || 0, note: $("lvNote").value.trim(),
     payMonth: $("lvPayM").value || "", ded: $("lvDedIn").value === "" ? null : +$("lvDedIn").value };
   if (!rec.type || !rec.date || !rec.hours) return toast("請選假別、日期和時數");
+  {
+    const c = leaveCalc(LEAVE.records.filter(r => r.id !== lvEditId).concat(rec))[rec.id];
+    const t = lvType(rec.type), lead = lvType(lvQuotaId(t)) || t;
+    if (c?.overH && !confirm(`${lead.name}今年的額度是 ${capLabel(c.capH)}，加上這次共 ${fmtLv(c.usedAfter)}，會超過 ${fmtLv(c.overH)}。\n確定還是要存嗎？`)) return;
+  }
   const records = LEAVE.records.filter(r => r.id !== lvEditId).concat(rec);
   $("lvSave").disabled = true;
   try { await saveLeave({ records }); lvYearSel = +rec.date.slice(0, 4); renderLeave(); $("dlgLeave").close(); toast("已儲存"); }
@@ -2890,7 +2956,7 @@ function lvTypeRow(t) {
       <button type="button" class="del" aria-label="刪除這個假別">×</button>
     </div>
     <div class="r2">
-      <label>每年天數（空白＝不限）<input type="number" class="t-limit" inputmode="numeric" min="0" placeholder="不限" value="${t.limit ?? ""}"></label>
+      <label>每年天數（空白＝不限）<input type="number" class="t-limit" inputmode="decimal" step="any" min="0" placeholder="不限" value="${capOf(t) != null ? Math.round(capOf(t) / 8 * 1000) / 1000 : ""}"></label>
       <label>超過後<select class="t-over"><option value="0">全扣</option><option value="0.5">扣一半</option><option value="1">不扣薪</option></select></label>
       <label style="grid-column:1/-1">天數合併<select class="t-group"></select></label>
     </div>`;
@@ -2924,7 +2990,7 @@ $("lvTypeCancel").onclick = () => $("dlgLvTypes").close();
 $("lvTypeSave").onclick = async () => {
   const types = [...$("lvTypeList").children].map(r => ({
     id: r.dataset.id, name: r.querySelector(".t-name").value.trim(), pay: +r.querySelector(".t-pay").value,
-    limit: r.querySelector(".t-limit").value === "" ? null : +r.querySelector(".t-limit").value,
+    limit: null, limitH: r.querySelector(".t-limit").value === "" ? null : Math.round(+r.querySelector(".t-limit").value * 8 * 100) / 100,
     overPay: +r.querySelector(".t-over").value, group: r.querySelector(".t-group").value,
   })).filter(t => t.name);
   if (!types.length) return toast("至少要有一個假別");
