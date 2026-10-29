@@ -1156,8 +1156,8 @@
 <dialog id="dlgLvImport">
   <div class="dlg">
     <div class="dlg-head"><h3>貼上匯入請假</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
-    <p class="cat-hint" style="margin:0">到公司的請假系統，把請假明細整張表選起來複製，貼到下面。每一行要有假別、日期和時數，有沒有標題列都可以。「不准」的會自動略過，已經記過的也不會重複匯入。</p>
-    <textarea class="notes" id="lvImpText" style="min-height:140px;font-size:13px" placeholder="例如：&#10;休假	2026/10/16 15:30:00	2026/10/16 17:00:00	1.50		准&#10;傷病假	2026/10/02 13:00:00	2026/10/02 17:00:00	4.00	肚子痛	准"></textarea>
+    <p class="cat-hint" style="margin:0">一行一筆，依序填：<b>假別、開始時間、結束時間、時數</b>，用 Tab 或空白隔開都可以。從公司系統或 Excel 整張表複製貼上也行，多出來的欄位會自動略過，事由會變成備註。沒有時數的話，會照上班時間 8:00–17:00（午休 12:00–13:00）自動算。已經記過的不會重複匯入。</p>
+    <textarea class="notes" id="lvImpText" style="min-height:140px;font-size:13px" placeholder="例如：&#10;休假	2026/10/16 15:30	2026/10/16 17:00	1.5&#10;傷病假	2026/10/02 13:00	2026/10/02 17:00	4&#10;休假	2026/09/21 08:00	2026/09/24 17:00"></textarea>
     <div id="lvImpPrev"></div>
     <div class="dlg-actions sticky-act">
       <button class="btn-cancel" id="lvImpCancel">取消</button>
@@ -2608,28 +2608,42 @@ $("lvDel").onclick = async () => {
 // ===== 從公司系統貼上匯入 =====
 // 每一行：找日期、時數、假別名稱，其他欄位當備註；「不准／駁回／取消」的略過
 let lvImp = { rows: [], unknown: [] };
+// 上班時間（沒有時數欄時用來算時數）：8:00–12:00、13:00–17:00
+const WORK_SPANS = [[8 * 60, 12 * 60], [13 * 60, 17 * 60]];
+function workHours(a, b) {           // a、b 是 Date；逐天算跟上班時間重疊多少
+  let mins = 0;
+  for (let d = new Date(a.getFullYear(), a.getMonth(), a.getDate()); d <= b; d.setDate(d.getDate() + 1)) {
+    const day0 = d.getTime();
+    WORK_SPANS.forEach(([s, e]) => {
+      const lo = Math.max(day0 + s * 6e4, a.getTime()), hi = Math.min(day0 + e * 6e4, b.getTime());
+      if (hi > lo) mins += (hi - lo) / 6e4;
+    });
+  }
+  return Math.round(mins / 60 * 100) / 100;
+}
+const APPROVE = /^(准|核准|同意|已核准|通過|已通過|簽核完成)$/;
 function parseLeaveText(text) {
   const rows = [];
+  const DT = /(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:[ T]+(\d{1,2}):(\d{2})(?::\d{2})?)?/g;
   text.split(/\r?\n/).forEach(line => {
     if (!line.trim()) return;
-    const cells = line.split(/\t|\s{2,}|,(?=\S)/).map(c => c.trim()).filter((c, i, a) => c || (i > 0 && i < a.length - 1));
-    const dm = line.match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
-    if (!dm) return;                                   // 標題列或沒有日期的行
-    if (/不准|駁回|退回|取消|未核准/.test(line)) return;
-    const date = `${dm[1]}-${pad(+dm[2])}-${pad(+dm[3])}`;
-    // 時數：不含日期、時間的純數字欄位，取最後一個
-    const nums = cells.filter(c => /^\d+(\.\d+)?$/.test(c) && !/^\d{4}$/.test(c));
-    let hours = nums.length ? +nums[nums.length - 1] : NaN;
-    if (!(hours > 0)) {                               // 沒有時數欄：用「天」換算
-      const dd = line.match(/(\d+(?:\.\d+)?)\s*天/); if (dd) hours = +dd[1] * 8;
-    }
+    if (/不准|駁回|退回|取消|未核准|抽單/.test(line)) return;
+    const dts = [...line.matchAll(DT)];
+    if (!dts.length) return;                           // 標題列或沒有日期的行
+    const toDate = m => new Date(+m[1], +m[2] - 1, +m[3], m[4] != null ? +m[4] : 8, m[5] != null ? +m[5] : 0);
+    const date = `${dts[0][1]}-${pad(+dts[0][2])}-${pad(+dts[0][3])}`;
+    // 拿掉日期時間之後，剩下的欄位（Tab 或空白隔開）
+    const rest = line.replace(DT, "\t").split(/\t|\s+/).map(c => c.trim()).filter(Boolean);
+    const numIdx = rest.map((c, i) => /^\d+(\.\d+)?$/.test(c) ? i : -1).filter(i => i >= 0);
+    let hours = numIdx.length ? +rest[numIdx[numIdx.length - 1]] : NaN;
+    const unit = line.match(/(\d+(?:\.\d+)?)\s*(天|日|小時|時|h|hr)/i);
+    if (unit) hours = /天|日/.test(unit[2]) ? +unit[1] * 8 : +unit[1];
+    if (!(hours > 0) && dts.length >= 2 && dts[0][4] != null && dts[1][4] != null) hours = workHours(toDate(dts[0]), toDate(dts[1]));
     if (!(hours > 0)) return;
-    const name = (cells.find(c => /[一-鿿]/.test(c) && !/准/.test(c)) || "").replace(/\s/g, "");
+    const words = rest.filter(c => /[一-鿿]/.test(c) && !APPROVE.test(c) && !/^\d/.test(c));
+    const name = (words[0] || "").replace(/\s/g, "");
     if (!name) return;
-    // 事由：時數後面那一欄（如果是中文、不是准不准）
-    const hi = cells.findIndex(c => c === nums[nums.length - 1]);
-    const note = cells.slice(hi + 1).find(c => c && !/^(准|核准|同意|已核准)$/.test(c)) || "";
-    rows.push({ name, date, hours, note });
+    rows.push({ name, date, hours, note: words.slice(1).join(" ") });
   });
   return rows;
 }
