@@ -249,6 +249,7 @@
   .sec-title { font-size: 15px; font-weight: 700; margin: 8px 0 0; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 0; overflow: hidden; background: var(--line); }
   .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .avatar:has(img[hidden])::before { content: attr(data-initial); }
 
   /* 預算規劃頁 */
   .bp-row { display: grid; grid-template-columns: 1fr 130px; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
@@ -556,6 +557,155 @@
     dialog[open] { animation: none; }
     .btn-primary:active, .btn-ghost:active, .btn-cancel:active, .btn-danger:active, .x-btn:active, .fab:active { transform: none; }
   }
+
+  /* ===== 手機操作改版：底部分頁列、拇指好按的位置 ===== */
+  :root { --tabbar-h: 64px; }
+  .wrap { padding-bottom: calc(var(--tabbar-h) + 40px + env(safe-area-inset-bottom, 0px)); }
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    display: grid; grid-template-columns: repeat(5, 1fr); align-items: end;
+    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+    padding: 0 6px env(safe-area-inset-bottom, 0px);
+    background: var(--paper);
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px);
+    border-top: 1px solid var(--line);
+  }
+  .tabbar button {
+    height: var(--tabbar-h); border: 0; background: none; color: var(--muted);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    font-size: 11px; font-weight: 500; -webkit-tap-highlight-color: transparent;
+  }
+  .tabbar button svg { width: 24px; height: 24px; }
+  .tabbar button.on { color: var(--accent); font-weight: 700; }
+  .tabbar button:active svg { transform: scale(.9); }
+  .tab-add { color: var(--accent) !important; }
+  .tab-add i {
+    width: 52px; height: 52px; margin-top: -22px; border-radius: 18px; display: grid; place-items: center;
+    background: var(--accent); color: #fff; box-shadow: 0 6px 16px rgba(20, 108, 107, .35);
+  }
+  @media (prefers-color-scheme: dark) { .tab-add i { color: #0F1A1D; } }
+  .tab-add i svg { width: 26px !important; height: 26px !important; }
+  .tab-add:active i { transform: scale(.94); }
+  .toast, .undo { bottom: calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom, 0px)); }
+
+  /* 首頁頂部固定 */
+  #app .topbar {
+    position: sticky; top: 0; z-index: 10; margin: -16px -16px 12px; padding: 10px 12px 8px;
+    background: var(--bg);
+    background: color-mix(in srgb, var(--bg) 90%, transparent);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  }
+  .month button { width: 44px; height: 44px; }
+  .icon-btn { width: 44px; height: 44px; }
+
+  /* 預算分頁 */
+  .page-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 2px 10px; }
+  .page-head h2 { margin: 0; font-size: 24px; }
+  .btn-ghost.sm, .btn-primary.sm { min-height: 38px; padding: 0 14px; font-size: 14px; background: var(--paper); }
+  .cycle-nav { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 14px; }
+  .cycle-nav button { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--paper); font-size: 20px; }
+  .cycle-nav button:disabled { opacity: .3; }
+  .cycle-nav span { min-width: 150px; text-align: center; font-weight: 700; line-height: 1.3; }
+  .cycle-nav small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+
+  /* 資產／股票切換 */
+  .tab-seg { margin-bottom: 14px; background: var(--paper); }
+  .tab-seg button.on { background: var(--accent); color: #fff; box-shadow: none; }
+  @media (prefers-color-scheme: dark) { .tab-seg button.on { color: #0F1A1D; } }
+  .an-head { min-height: 44px; }
+
+  /* 國內／海外改成小按鈕 */
+  .split { gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .split button {
+    display: inline-flex; align-items: baseline; gap: 6px; min-height: 36px; padding: 6px 12px;
+    border: 1px solid var(--line); border-radius: 18px; background: var(--paper); font-size: 13px;
+  }
+  .split button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .split b { display: inline; font-size: 16px; }
+
+  /* 分類只列前幾名 */
+  .bars-more { justify-self: start; min-height: 36px; padding: 0 4px; border: 0; background: none; color: var(--accent); font-size: 14px; font-weight: 500; }
+
+  /* 載入中骨架 */
+  .skel { background: var(--paper); border-radius: 12px; overflow: hidden; }
+  .skel-row { display: grid; grid-template-columns: 10px 1fr 60px; gap: 12px; align-items: center; padding: 14px 16px; border-top: 1px solid var(--line); }
+  .skel-row:first-child { border-top: 0; }
+  .skel-row i, .skel-row b, .skel-row em { display: block; border-radius: 6px; background: var(--bg); animation: skel 1.2s ease-in-out infinite; }
+  .skel-row i { width: 10px; height: 10px; border-radius: 50%; }
+  .skel-row b { height: 12px; width: 60%; margin: 4px 0; }
+  .skel-row b + b { width: 35%; }
+  .skel-row em { height: 18px; }
+  @keyframes skel { 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .skel-row i, .skel-row b, .skel-row em { animation: none; } }
+
+  /* 底部操作按鈕固定在拇指範圍 */
+  .page-actions.sticky {
+    position: sticky; bottom: calc(var(--tabbar-h) + 8px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+    padding: 10px; margin: 0 -6px; border-radius: 16px;
+    background: var(--paper);
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: 0 4px 18px rgba(10, 20, 25, .12);
+  }
+  .page-actions.sticky button { flex: 1; min-height: 48px; }
+  .hold-act button, .edit-btn { min-height: 38px; }
+  .st-grid small { display: block; }
+  #plan #budEdit { display: none; }          /* 預算分頁上方已經有「編輯預算規劃」 */
+  .avatar { display: grid; place-items: center; font-weight: 700; color: var(--accent); background: var(--accent-soft); }
+
+  /* 可收合的區塊 */
+  .fold-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 0; background: none; padding: 0; text-align: left; min-height: 32px; }
+  .fold-head .sec-title { margin: 0; }
+  .fold-head .fold-sum { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .fold-head .chev { width: 18px; height: 18px; color: var(--muted); transition: transform .15s; flex: none; }
+  .folded .fold-head .chev { transform: rotate(-90deg); }
+  .folded > :not(.fold-head) { display: none !important; }
+
+  /* 記一筆 */
+  .dlg { --pad: 22px; grid-template-columns: minmax(0, 1fr); }
+  @media (max-width: 520px) { .dlg { --pad: 20px; } }
+  .amt-in { display: flex; align-items: baseline; gap: 8px; padding: 6px 4px 10px; border-bottom: 2px solid var(--line); }
+  .amt-in:focus-within { border-bottom-color: var(--accent); }
+  .amt-in span { font-family: var(--num); font-size: 20px; font-weight: 600; color: var(--muted); }
+  .amt-in input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-family: var(--num); font-size: 44px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield; }
+  .amt-in input::-webkit-inner-spin-button, .amt-in input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .date-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .date-row input { flex: 1; min-width: 140px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--bg); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chips.scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: -4px calc(-1 * var(--pad)) 0; padding: 0 var(--pad) 2px; }
+  .chips.scroll::-webkit-scrollbar { display: none; }
+  .chips button { flex: none; min-height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); font-size: 14px; white-space: nowrap; }
+  .chips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  @media (prefers-color-scheme: dark) { .chips button.on { color: #0F1A1D; } }
+  .chips button small { color: var(--muted); margin-left: 4px; font-family: var(--num); }
+  .flabel { font-size: 13px; color: var(--muted); }
+  .cat-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; }
+  .cat-chips button {
+    display: flex; align-items: center; gap: 6px; min-height: 42px; padding: 0 10px; border-radius: 12px;
+    border: 1.5px solid transparent; background: var(--bg); font-size: 14px; text-align: left;
+  }
+  .cat-chips button i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .cat-chips button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat-chips button.on { border-color: var(--c, var(--accent)); background: var(--paper); font-weight: 700; box-shadow: 0 0 0 3px color-mix(in srgb, var(--c, var(--accent)) 18%, transparent); }
+  details.more { border-radius: 12px; background: var(--bg); }
+  details.more > summary { list-style: none; cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 14px; color: var(--muted); }
+  details.more > summary::-webkit-details-marker { display: none; }
+  details.more > summary::after { content: "▾"; margin-left: auto; }
+  details.more[open] > summary::after { content: "▴"; }
+  details.more > summary span { color: var(--ink); font-weight: 500; }
+  details.more[open] { padding-bottom: 12px; }
+  details.more .back-box, details.more .field { margin: 0 12px; }
+  details.more .field { margin-top: 10px; }
+  details.more .back-box { background: var(--paper); }
+  .sticky-act {
+    position: sticky; bottom: 0; z-index: 2; margin: 0 calc(-1 * var(--pad)) calc(-1 * var(--pad));
+    padding: 12px var(--pad) calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--paper); border-top: 1px solid var(--line);
+  }
+  #dlgTx .dlg { padding-bottom: var(--pad); }
+  #dlgTx .dlg-actions button { min-height: 50px; }
+  #dlgTx .dlg-actions .btn-primary { flex: 2; }
+  #dlgTx .dlg-actions .btn-danger { flex: 0 0 auto; order: 0; flex-basis: auto; margin-right: 0; padding: 0 16px; }
+  @media (max-width: 520px) { #dlgTx .dlg { padding-bottom: 20px; } #dlgTx .dlg-actions { flex-wrap: nowrap; } }
 </style>
 </head>
 <body>
@@ -584,16 +734,7 @@
   </div>
 
   <div class="tip-card" id="tipCard">
-    <div>
-      點右上角的<b>頭像</b>，可以使用更多功能：
-      <ul>
-        <li>預算規劃：設定收入、各分類預算，寫下你的存錢計畫</li>
-        <li>股票投資：記錄買賣和股利，看持股損益</li>
-        <li>固定支出／訂閱：自動找出每個月都會扣的錢</li>
-        <li>消費分析：每家店總共花了多少，由高到低排行</li>
-        <li>帳單結帳日、管理分類、匯出 CSV、刷卡自動匯入</li>
-      </ul>
-    </div>
+    <div>用下方的分頁切換<b>首頁、預算、資產</b>；中間的 <b>＋</b> 隨時記一筆。固定支出、店家排行和設定在「更多」。</div>
     <button class="tip-x" id="tipX">知道了</button>
   </div>
 
@@ -617,6 +758,24 @@
     </div>
   </section>
 
+  <div class="filter-note hidden" id="filterNote">
+    <span id="filterText"></span>
+    <button id="clearFilter">顯示全部</button>
+  </div>
+  <div id="list"></div>
+</main>
+
+<!-- 預算分頁 -->
+<main id="plan" class="wrap hidden">
+  <div class="page-head">
+    <h2>預算</h2>
+    <button class="btn-ghost sm" id="btnPlanEdit">編輯預算規劃</button>
+  </div>
+  <div class="cycle-nav">
+    <button id="planPrev" aria-label="上一期">‹</button>
+    <span id="planCycle"></span>
+    <button id="planNext" aria-label="下一期">›</button>
+  </div>
   <section class="card hidden" id="budCard"></section>
 
   <section class="trend hidden" id="trend">
@@ -633,12 +792,6 @@
     <div class="trend-stats" id="trendStats"></div>
     <div class="movers" id="movers"></div>
   </section>
-
-  <div class="filter-note hidden" id="filterNote">
-    <span id="filterText"></span>
-    <button id="clearFilter">顯示全部</button>
-  </div>
-  <div id="list"></div>
 </main>
 
 <!-- 店家排行 -->
@@ -668,8 +821,8 @@
     <button class="icon-btn back-btn" aria-label="返回"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
     <h2>預算規劃</h2>
   </div>
-  <div class="an-box">
-    <p class="sec-title" style="margin:0">薪資與扣款</p>
+  <div class="an-box" id="bSalBox">
+    <button type="button" class="fold-head" id="bSalHead" aria-expanded="true"><p class="sec-title">薪資與扣款</p><span class="fold-sum" id="bSalSum"></span><svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg></button>
     <p class="cat-hint" style="margin:0">照薪資單填，網頁會自動算出實際拿到的錢。「% 投保」的投保薪資沒填會照級距表自動推算，跟薪資單不同再自己填。資料只存在你自己的帳號。</p>
     <div class="row2">
       <div class="field"><label for="bGross">本薪（應發金額）</label><input class="num-in" type="number" id="bGross" inputmode="numeric" min="0" placeholder="0"></div>
@@ -706,7 +859,7 @@
     <p class="cat-hint">寫下這段時間的目標或計畫，只有你自己看得到。</p>
     <textarea class="notes" id="bNotes" placeholder="例如：&#10;・年底前存到 10 萬&#10;・12 月日本旅遊預算 3 萬，從 11 月開始外食減少&#10;・Netflix 和 Disney+ 留一個就好"></textarea>
   </div>
-  <div class="page-actions">
+  <div class="page-actions sticky">
     <button class="btn-cancel" id="btnBudCancel">取消</button>
     <button class="btn-primary" id="btnBudSave">儲存</button>
   </div>
@@ -714,8 +867,8 @@
 
 <!-- 股票投資 -->
 <main id="stocks" class="wrap hidden">
+  <div class="seg seg-full tab-seg"><button data-v="assets">資產總覽</button><button data-v="stocks" class="on">股票</button></div>
   <div class="an-head">
-    <button class="icon-btn back-btn" aria-label="返回"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
     <h2>股票投資</h2>
     <button class="btn-primary" id="btnStAdd">＋ 新增交易</button>
   </div>
@@ -744,8 +897,8 @@
 
 <!-- 資產總覽 -->
 <main id="assets" class="wrap hidden">
+  <div class="seg seg-full tab-seg"><button data-v="assets" class="on">資產總覽</button><button data-v="stocks">股票</button></div>
   <div class="an-head">
-    <button class="icon-btn back-btn" aria-label="返回"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
     <h2>資產總覽</h2>
     <button class="btn-primary" id="btnBase">更新存款</button>
   </div>
@@ -778,35 +931,47 @@
   <div class="an-list" id="subOld"></div>
 </main>
 
-<button class="fab hidden" id="btnAdd">＋ 記一筆</button>
+<nav class="tabbar hidden" id="tabbar" aria-label="主要分頁">
+  <button data-tab="app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-6h-6v6H5.5A1.5 1.5 0 0 1 4 19z"/></svg><span>首頁</span></button>
+  <button data-tab="plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg><span>預算</span></button>
+  <button class="tab-add" id="btnAdd" aria-label="記一筆"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></i><span>記一筆</span></button>
+  <button data-tab="assets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.5"/><circle cx="16" cy="13.5" r="1.2" fill="currentColor"/></svg><span>資產</span></button>
+  <button data-tab="more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="18.5" cy="12" r="1.4" fill="currentColor"/></svg><span>更多</span></button>
+</nav>
 
 <dialog id="dlgTx">
   <form class="dlg" method="dialog" id="txForm">
     <div class="dlg-head"><h3 id="txTitle">記一筆</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
-    <div class="row2">
-      <div class="field"><label for="fDate">日期</label><input type="date" id="fDate" required></div>
-      <div class="field"><label for="fAmount">金額</label><input type="number" id="fAmount" inputmode="decimal" step="any" min="0" required></div>
+    <label class="amt-in" for="fAmount"><span>NT$</span><input type="number" id="fAmount" inputmode="decimal" step="any" min="0" required placeholder="0" aria-label="金額"></label>
+    <div class="date-row">
+      <div class="chips" id="fDays"><button type="button" data-d="0">今天</button><button type="button" data-d="1">昨天</button><button type="button" data-d="2">前天</button></div>
+      <input type="date" id="fDate" required aria-label="日期">
     </div>
-    <div class="field"><label for="fStore">商店或項目</label><input id="fStore" required placeholder="例如：早餐店"></div>
+    <div class="field"><label for="fStore">商店或項目</label><input id="fStore" required placeholder="例如：早餐店" autocomplete="off"></div>
+    <div class="chips scroll hidden" id="fStores" aria-label="常用店家"></div>
     <div class="field">
-      <div class="field-head"><label for="fCat">分類</label><button type="button" class="link-btn" id="btnCatsInline">管理分類</button></div>
-      <select id="fCat"></select>
+      <div class="field-head"><span class="flabel">分類</span><button type="button" class="link-btn" id="btnCatsInline">管理分類</button></div>
+      <div class="cat-chips" id="fCatChips" role="radiogroup" aria-label="分類"></div>
+      <select id="fCat" class="hidden" aria-hidden="true" tabindex="-1"></select>
     </div>
     <label class="check hidden" id="ruleBox"><input type="checkbox" id="fRule"><span id="ruleText"></span></label>
-    <div class="back-box">
-      <div class="field-head"><label for="fBack" style="font-size:13px;color:var(--muted)">別人分攤（例如同學給我的錢）</label>
-        <div class="quick"><button type="button" data-q="half">一半</button><button type="button" data-q="all">全部</button><button type="button" data-q="clear">清除</button></div>
+    <details class="more" id="fMore">
+      <summary>別人分攤、備註<span id="fMoreSum"></span></summary>
+      <div class="back-box">
+        <div class="field-head"><label for="fBack" style="font-size:13px;color:var(--muted)">別人分攤（例如同學給我的錢）</label>
+          <div class="quick"><button type="button" data-q="half">一半</button><button type="button" data-q="all">全部</button><button type="button" data-q="clear">清除</button></div>
+        </div>
+        <div class="row2">
+          <input type="number" id="fBack" inputmode="decimal" step="any" min="0" placeholder="0" aria-label="分攤金額">
+          <input id="fBackWho" placeholder="誰（選填）" aria-label="誰付的">
+        </div>
+        <label class="check-inline"><input type="checkbox" id="fBackPending">還沒收到，先記著</label>
+        <div class="back-hint" id="fBackHint"></div>
       </div>
-      <div class="row2">
-        <input type="number" id="fBack" inputmode="decimal" step="any" min="0" placeholder="0" aria-label="分攤金額">
-        <input id="fBackWho" placeholder="誰（選填）" aria-label="誰付的">
-      </div>
-      <label class="check-inline"><input type="checkbox" id="fBackPending">還沒收到，先記著</label>
-      <div class="back-hint" id="fBackHint"></div>
-    </div>
-    <div class="field"><label for="fNote">備註</label><input id="fNote" placeholder="選填"></div>
+      <div class="field"><label for="fNote">備註</label><input id="fNote" placeholder="選填"></div>
+    </details>
     <div class="info hidden" id="fInfo"></div>
-    <div class="dlg-actions">
+    <div class="dlg-actions sticky-act">
       <button type="button" class="btn-danger hidden" id="btnDelete">刪除</button>
       <button type="button" class="btn-cancel" id="btnCancel">取消</button>
       <button type="submit" class="btn-primary" id="btnSave">儲存</button>
@@ -902,9 +1067,9 @@
   <div class="dlg">
     <div class="dlg-head"><h3 id="menuName"></h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
     <div class="menu-list">
-      <button class="btn-ghost" id="btnAssets"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.5"/><circle cx="16" cy="13.5" r="1.2" fill="currentColor"/></svg>資產總覽</button>
-      <button class="btn-ghost" id="btnBudget"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>預算規劃</button>
-      <button class="btn-ghost" id="btnStocks"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg>股票投資</button>
+      <button class="btn-ghost hidden" id="btnAssets"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.5"/><circle cx="16" cy="13.5" r="1.2" fill="currentColor"/></svg>資產總覽</button>
+      <button class="btn-ghost hidden" id="btnBudget"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>預算規劃</button>
+      <button class="btn-ghost hidden" id="btnStocks"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg>股票投資</button>
       <button class="btn-ghost" id="btnSubs"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/></svg>固定支出／訂閱</button>
       <button class="btn-ghost" id="btnAnalysis"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>消費分析（店家排行）</button>
       <div class="menu-sep"></div>
@@ -1150,22 +1315,45 @@ function setCycleDay(day) {
   CUR = cycleOf(now.getFullYear(), now.getMonth() + 1, now.getDate());
   ym = { ...CUR };
 }
+let showAllCats = false;
 let trendN = 6, cycleCache = {}, trendToken = 0;
 const keyOf = c => `${c.y}-${pad(c.m)}`;
 function backCycles(c, k) { let y = c.y, m = c.m - k; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } return { y, m }; }
 
 // ===== 頁面切換 =====
-const VIEWS = ["app", "analysis", "budget", "stocks", "subs", "assets"];
+const VIEWS = ["app", "plan", "analysis", "budget", "stocks", "subs", "assets"];
+// 分頁的根頁面；從根頁面進到子頁面（例如預算規劃），按返回會回到原本的分頁
+const ROOTS = ["app", "plan", "assets", "stocks"];
+const TAB_OF = { app: "app", plan: "plan", budget: "plan", assets: "assets", stocks: "assets", analysis: "more", subs: "more" };
+let curView = "app", backTo = "app", assetsSeg = "assets";
 function showView(v) {
+  if (!ROOTS.includes(v) && ROOTS.includes(curView)) backTo = curView;
+  curView = v;
+  if (v === "assets" || v === "stocks") assetsSeg = v;
   VIEWS.forEach(x => $(x).classList.toggle("hidden", x !== v));
-  $("btnAdd").classList.toggle("hidden", v !== "app");
+  $("tabbar").querySelectorAll("[data-tab]").forEach(b => {
+    const on = b.dataset.tab === TAB_OF[v];
+    b.classList.toggle("on", on);
+    if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
   window.scrollTo(0, 0);
 }
+const goBack = () => showView(backTo);
 function leaveMain() {
   if ($("dlgMenu").open) $("dlgMenu").close();
   if (searching) setSearchMode(false);
 }
-document.querySelectorAll(".back-btn").forEach(b => b.onclick = () => showView("app"));
+document.querySelectorAll(".back-btn").forEach(b => b.onclick = goBack);
+// 底部分頁列
+$("tabbar").querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
+  const t = b.dataset.tab;
+  if (t === "more") return $("dlgMenu").showModal();
+  if ($("dlgMenu").open) $("dlgMenu").close();
+  if (t === "assets") return assetsSeg === "stocks" ? openStocks() : openAssets();
+  if (t === curView) return window.scrollTo({ top: 0, behavior: "smooth" });   // 再點一次回到最上面
+  showView(t);
+});
+document.querySelectorAll(".tab-seg button").forEach(b => b.onclick = () => b.dataset.v === "stocks" ? openStocks() : openAssets());
 
 function fillCatSelect(current) {
   const prev = $("fCat").value;
@@ -1174,17 +1362,18 @@ function fillCatSelect(current) {
   $("fCat").innerHTML = `<option value="">${UNCAT}</option>` +
     names.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
   if (names.includes(prev)) $("fCat").value = prev;
+  renderCatChips();
 }
 fillCatSelect();
 
 // 提示卡片：按「知道了」後不再顯示
 let tipHidden = false;
-try { tipHidden = localStorage.getItem("tipHidden") === "1"; } catch (e) {}
+try { tipHidden = localStorage.getItem("tipHidden2") === "1"; } catch (e) {}
 $("tipCard").classList.toggle("hidden", tipHidden);
 $("tipX").onclick = () => {
   tipHidden = true;
   $("tipCard").classList.add("hidden");
-  try { localStorage.setItem("tipHidden", "1"); } catch (e) {}
+  try { localStorage.setItem("tipHidden2", "1"); } catch (e) {}
 };
 
 // ===== 登入 =====
@@ -1227,9 +1416,14 @@ onAuthStateChanged(auth, async u => {
   user = u;
   $("login").classList.toggle("hidden", !!u);
   $("app").classList.toggle("hidden", !u);
-  $("btnAdd").classList.toggle("hidden", !u);
+  $("tabbar").classList.toggle("hidden", !u);
+  curView = "app"; backTo = "app";
+  if (u) showView("app");
   if (u) {
     $("avatarImg").src = u.photoURL || "";
+    $("avatarImg").hidden = !u.photoURL;
+    $("avatarImg").onerror = () => { $("avatarImg").hidden = true; };
+    $("btnMenu").dataset.initial = (u.displayName || u.email || "?").trim().charAt(0).toUpperCase();
     $("menuName").textContent = u.displayName || u.email;
     unsubCats = onSnapshot(doc(db, "users", u.uid, "settings", "categories"), snap => {
       const list = snap.exists() && snap.data().list;
@@ -1269,6 +1463,8 @@ function subscribe() {
   $("monthLabel").innerHTML = `${ym.y} 年 ${ym.m} 月帳單<span class="caret">▼</span><div class="cycle">${r.label}</div>`;
   $("nextMonth").disabled = ym.y > CUR.y || (ym.y === CUR.y && ym.m >= CUR.m);
   $("nextMonth").style.opacity = $("nextMonth").disabled ? .3 : "";
+  $("planCycle").innerHTML = `${ym.m} 月帳單<small>${r.label}</small>`;
+  $("planNext").disabled = $("nextMonth").disabled;
   const start = r.start, next = r.end;
   const q = query(collection(db, "users", user.uid, "transactions"),
     where("date", ">=", start), where("date", "<", next), orderBy("date", "desc"));
@@ -1279,7 +1475,7 @@ function subscribe() {
     render();
   } else {
     $("total").textContent = "…";
-    $("list").innerHTML = `<div class="empty">載入中…</div>`;
+    $("list").innerHTML = `<div class="skel" aria-label="載入中">${'<div class="skel-row"><i></i><span><b></b><b></b></span><em></em></div>'.repeat(5)}</div>`;
   }
   unsub = onSnapshot(q, snap => {
     txs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -1298,6 +1494,9 @@ function shiftMonth(d) {
   subscribe();
 }
 $("prevMonth").onclick = () => shiftMonth(-1);
+$("planPrev").onclick = () => shiftMonth(-1);
+$("planNext").onclick = () => shiftMonth(1);
+$("btnPlanEdit").onclick = openBudget;
 $("nextMonth").onclick = () => shiftMonth(1);
 
 // 同一家店、同金額、同一天、10 分鐘內的刷卡紀錄，可能是重複扣款或重複匯入
@@ -1379,13 +1578,18 @@ function render() {
   const max = cats[0]?.[1] || 1;
   $("chart").classList.toggle("hidden", !cats.length);
   renderDonut(cats, chartTotal);
-  $("bars").innerHTML = cats.map(([c, v]) => `
+  // 預設只列前 5 名，其他收起來（選到後面的分類時自動展開）
+  const TOP = 5;
+  const filterIdx = filter ? cats.findIndex(([c]) => c === filter) : -1;
+  const showCats = showAllCats || cats.length <= TOP + 1 || filterIdx >= TOP ? cats : cats.slice(0, TOP);
+  $("bars").innerHTML = showCats.map(([c, v]) => `
     <button class="bar ${filter && filter !== c ? "dim" : ""}" data-cat="${esc(c)}">
       <span class="bar-name">${esc(c)}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${(Math.max(v, 0) / max * 100).toFixed(1)}%;background:${colorOf(c)}"></span></span>
       <span class="bar-amt">${fmt(v)}<span class="bar-pct">${chartTotal ? Math.round(v / chartTotal * 100) : 0}%</span>${+BUDGET.cats?.[c] > 0 && !region
         ? `<span class="bar-bud ${v > +BUDGET.cats[c] ? "over" : ""}">預算 ${fmt(BUDGET.cats[c])}${v > +BUDGET.cats[c] ? `，超支 ${fmt(v - BUDGET.cats[c])}` : `，剩 ${fmt(BUDGET.cats[c] - v)}`}</span>` : ""}</span>
-    </button>`).join("");
+    </button>`).join("") + (cats.length > TOP + 1 ? `<button class="bars-more" id="barsMore">${showCats.length < cats.length ? `顯示全部 ${cats.length} 個分類 ▾` : "只顯示前 5 名 ▴"}</button>` : "");
+  if ($("barsMore")) $("barsMore").onclick = () => { showAllCats = !showAllCats; render(); };
   $("bars").querySelectorAll(".bar").forEach(b => b.onclick = () => {
     filter = filter === b.dataset.cat ? null : b.dataset.cat; render();
   });
@@ -1474,7 +1678,7 @@ function renderBudget(twd) {
       <div class="row"><span>${remain < 0 ? "本期預算已超支" : isCurrent ? "本期預算還可以花" : "本期預算結餘"}</span><b class="${remain < 0 ? "over" : ""}">${fmt(Math.abs(remain))}</b></div>
       ${progBar(pct, remain < 0, isCurrent ? elapsed / days * 100 : null, false)}
       <div class="sub3">${fmt(spent)} ／ ${fmt(totalB)}${isCurrent && remain > 0 ? `・還有 ${leftDays} 天，每天 ${fmt(remain / leftDays)}` : ""}${proj !== null && proj > totalB ? `・<span class="warn">照目前速度會超支 ${fmt(proj - totalB)}</span>` : ""}</div>`;
-    mini.onclick = () => el.scrollIntoView({ behavior: "smooth", block: "start" });
+    mini.onclick = () => showView("plan");
     if (proj !== null) lines.push(proj > totalB
       ? `<span class="warn">照目前速度，本期預估花 <b>${fmt(proj)}</b>，會超支 <b>${fmt(proj - totalB)}</b></span>`
       : `照目前速度，本期預估花 <b>${fmt(proj)}</b>，在預算內`);
@@ -2034,6 +2238,7 @@ function openBudget() {
   $("bDeds").innerHTML = "";
   (sal.items?.length ? sal.items : DEFAULT_DEDS)
     .forEach(it => $("bDeds").append(dedRow(it, BUDGET.periodVar?.[keyOf(CUR)]?.[it.name])));
+  setFold($("bSalBox"), $("bSalHead"), +sal.gross > 0);    // 填過薪資就先收起來，要改再點開
   $("bFixes").innerHTML = "";
   const pf = BUDGET.periodFixed?.[keyOf(CUR)] || {};
   fixedNames().forEach(n => $("bFixes").append(fixRow(n, pf[n])));
@@ -2140,6 +2345,7 @@ function budgetHint() {
   $("bIncome").readOnly = useSal;
   $("bIncomeLbl").textContent = useSal ? `${CUR.m} 月帳單實發（自動算）` : "每月收入";
   if (useSal) $("bIncome").value = salNet;
+  $("bSalSum").textContent = useSal ? `實發 ${fmt(salNet)}` : "還沒填";
   $("bNet").classList.toggle("hidden", !useSal);
   if (useSal) $("bNet").innerHTML = `
     <span>本薪 <b>${fmt(sal.gross)}</b> − 扣款 <b>${fmt(ded)}</b>${sal.other ? ` ＋ 其他收入 <b>${fmt(sal.other)}</b>` : ""}</span>
@@ -2168,7 +2374,12 @@ $("bFillAvg").onclick = () => {
   toast(n ? `填入了 ${n} 個分類，可以再調整` : "沒有可以填入的（近 3 期沒有資料，或已經都填了）");
 };
 $("btnBudget").onclick = openBudget;
-$("btnBudCancel").onclick = () => showView("app");
+function setFold(box, head, folded) {
+  box.classList.toggle("folded", folded);
+  head.setAttribute("aria-expanded", !folded);
+}
+$("bSalHead").onclick = () => setFold($("bSalBox"), $("bSalHead"), !$("bSalBox").classList.contains("folded"));
+$("btnBudCancel").onclick = goBack;
 $("btnBudSave").onclick = async () => {
   const cats = {};
   $("bCats").querySelectorAll("input").forEach(i => { if (+i.value > 0) cats[i.dataset.cat] = +i.value; });
@@ -2197,7 +2408,7 @@ $("btnBudSave").onclick = async () => {
   try {
     await setDoc(doc(db, "users", user.uid, "settings", "budget"), data);
     BUDGET = { ...EMPTY_BUDGET, ...data };
-    showView("app");
+    goBack();
     render();
     toast("預算已儲存");
   } catch (err) {
@@ -2985,6 +3196,7 @@ function openTx(t) {
   $("fDate").value = t?.date || ymd(new Date());
   $("fAmount").value = t?.amount ?? "";
   $("fStore").value = t?.store || "";
+  $("fStores").querySelectorAll("button").forEach(x => x.classList.remove("on"));
   fillCatSelect(t?.category);
   $("fCat").value = t?.category || "";
   $("fNote").value = t?.note || "";
@@ -3002,7 +3214,13 @@ function openTx(t) {
   if (t && dupIds.has(t.id)) info.push("⚠ 同一天有一筆同店家、同金額的刷卡，請對一下帳單是否重複扣款");
   $("fInfo").textContent = info.join("，");
   $("fInfo").classList.toggle("hidden", !info.length);
+  renderStoreChips(!t);
+  syncCatChips();
+  syncDayChips();
+  moreSummary();
+  $("fMore").open = !!(+t?.paidBack > 0 || t?.note);
   $("dlgTx").showModal();
+  $("dlgTx").querySelector(".dlg").scrollTop = 0;
   if (!t) $("fAmount").focus();
 }
 $("btnAdd").onclick = () => openTx();
@@ -3036,10 +3254,72 @@ function updateRuleBox(reset) {
 }
 $("fStore").addEventListener("input", () => {
   const store = $("fStore").value.trim();
-  if (!editingId && storeRules[store] && !$("fCat").value) { fillCatSelect(storeRules[store]); $("fCat").value = storeRules[store]; }
+  if (!editingId && storeRules[store] && !$("fCat").value) { fillCatSelect(storeRules[store]); $("fCat").value = storeRules[store]; syncCatChips(); }
   updateRuleBox(true);
 });
-$("fCat").addEventListener("change", () => updateRuleBox(false));
+$("fCat").addEventListener("change", () => { updateRuleBox(false); syncCatChips(); });
+
+// 分類改成按鈕（背後還是原本的下拉選單）
+function renderCatChips() {
+  const opts = [...$("fCat").options];
+  $("fCatChips").innerHTML = opts.map(o => {
+    const name = o.value || UNCAT, col = o.value ? colorOf(o.value) : "#B9C0BC";
+    return `<button type="button" role="radio" data-v="${esc(o.value)}" style="--c:${col}"><i style="background:${col}"></i><span>${esc(name)}</span></button>`;
+  }).join("");
+  $("fCatChips").querySelectorAll("button").forEach(b => b.onclick = () => {
+    $("fCat").value = b.dataset.v;
+    $("fCat").dispatchEvent(new Event("change"));
+  });
+  syncCatChips();
+}
+function syncCatChips() {
+  $("fCatChips").querySelectorAll("button").forEach(b => {
+    const on = b.dataset.v === $("fCat").value;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-checked", on);
+  });
+}
+// 今天／昨天／前天
+function syncDayChips() {
+  $("fDays").querySelectorAll("button").forEach(b => {
+    const d = new Date(); d.setDate(d.getDate() - +b.dataset.d);
+    b.classList.toggle("on", ymd(d) === $("fDate").value);
+  });
+}
+$("fDays").querySelectorAll("button").forEach(b => b.onclick = () => {
+  const d = new Date(); d.setDate(d.getDate() - +b.dataset.d);
+  $("fDate").value = ymd(d);
+  syncDayChips();
+});
+$("fDate").addEventListener("change", syncDayChips);
+// 常用店家：最近幾期最常記的，點一下帶入店家和分類
+function renderStoreChips(show) {
+  const stat = {};
+  [txs, ...Object.values(cycleCache)].forEach(arr => (arr || []).forEach(t => {
+    const k = (t.store || "").trim();
+    if (!k || k.length > 20) return;
+    const x = stat[k] ||= { n: 0, last: "", cat: "" };
+    x.n++;
+    if ((t.date || "") >= x.last) { x.last = t.date || ""; x.cat = t.category || x.cat; }
+  }));
+  const top = Object.entries(stat).sort((a, b) => b[1].n - a[1].n || b[1].last.localeCompare(a[1].last)).slice(0, 10);
+  $("fStores").classList.toggle("hidden", !show || !top.length);
+  $("fStores").innerHTML = top.map(([k]) => `<button type="button" data-s="${esc(k)}">${esc(k)}</button>`).join("");
+  $("fStores").querySelectorAll("button").forEach(b => b.onclick = () => {
+    const name = b.dataset.s, cat = storeRules[name] ?? stat[name]?.cat ?? "";
+    $("fStore").value = name;
+    $("fStore").dispatchEvent(new Event("input"));
+    if (cat && !$("fCat").value) { fillCatSelect(cat); $("fCat").value = cat; $("fCat").dispatchEvent(new Event("change")); }
+    $("fStores").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    if (!$("fAmount").value) $("fAmount").focus();
+  });
+}
+function moreSummary() {
+  const back = parseFloat($("fBack").value) || 0, note = $("fNote").value.trim();
+  $("fMoreSum").textContent = [back ? `分攤 ${fmt(back)}${$("fBackPending").checked ? "（還沒收到）" : ""}` : "", note ? "有備註" : ""].filter(Boolean).join("・");
+}
+["fBack", "fNote"].forEach(id => $(id).addEventListener("input", moreSummary));
+$("fBackPending").addEventListener("change", moreSummary);
 
 async function saveStoreRule(store, category) {
   const next = { ...storeRules };
