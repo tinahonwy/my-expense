@@ -720,6 +720,24 @@
   .pay-item input[type=text] { border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; background: var(--bg); min-width: 0; width: 100%; }
   .pay-item .del { width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--danger-soft); color: var(--danger); font-size: 16px; line-height: 1; }
   #dlgPay .dlg-actions .btn-primary { flex: 2; }
+
+  /* 請假 */
+  .lv-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .lv-card { background: var(--paper); border-radius: 12px; padding: 12px 14px; display: grid; gap: 4px; border-left: 4px solid var(--c, var(--accent)); }
+  .lv-card .nm { font-size: 14px; font-weight: 700; }
+  .lv-card .big { font-family: var(--num); font-size: 26px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .lv-card .big small { font-size: 14px; color: var(--muted); font-weight: 500; margin-left: 2px; }
+  .lv-card .sub { font-size: 12px; }
+  .lv-card .prog { margin: 4px 0 0; height: 6px; }
+  .lv-card .prog span { background: var(--c, var(--accent)); }
+  .lv-total { grid-column: 1 / -1; background: var(--paper); border-radius: 12px; padding: 12px 14px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .lv-total b { font-family: var(--num); font-size: 20px; color: var(--danger); }
+  .lv-type { display: grid; gap: 8px; padding: 10px; background: var(--bg); border-radius: 12px; }
+  .lv-type .r1 { display: grid; grid-template-columns: 1fr 120px 32px; gap: 8px; align-items: center; }
+  .lv-type .r2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .lv-type label { font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
+  .lv-type input, .lv-type select { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--paper); min-width: 0; width: 100%; font-size: 15px; }
+  .lv-type .del { width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--danger-soft); color: var(--danger); font-size: 16px; }
 </style>
 </head>
 <body>
@@ -933,6 +951,31 @@
   </div>
 </main>
 
+<!-- 請假紀錄 -->
+<main id="leave" class="wrap hidden">
+  <div class="an-head">
+    <button class="icon-btn back-btn" aria-label="返回"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
+    <h2>請假紀錄</h2>
+    <button class="btn-primary" id="btnLvAdd">＋ 記請假</button>
+  </div>
+  <div class="cycle-nav">
+    <button id="lvPrev" aria-label="前一年">‹</button>
+    <span id="lvYear"></span>
+    <button id="lvNext" aria-label="後一年">›</button>
+  </div>
+  <div class="lv-cards" id="lvCards"></div>
+  <div class="sec-h" style="margin-top:18px"><span>請假明細</span><small>點一筆可以修改或刪除</small></div>
+  <div class="an-list" id="lvList"></div>
+  <div class="an-box" style="margin-top:18px">
+    <div class="field-head"><p class="sec-title" style="margin:0">假別設定</p><button class="link-btn" id="btnLvTypes">編輯假別</button></div>
+    <div class="field">
+      <label for="lvLag">請假扣的錢，反映在哪個月的薪水</label>
+      <select id="lvLag"><option value="0">當月薪水（10 月請假扣 10/1）</option><option value="1">下個月薪水（10 月請假扣 11/1）</option></select>
+    </div>
+    <p class="cat-hint" style="margin:0">扣薪照勞基法常用算法：時薪＝本薪 ÷ 30 ÷ 8。天數每年 1/1 重新計算。實際扣多少以公司薪資單為準，不一樣可以到「資產 → 薪資紀錄」修正那個月。</p>
+  </div>
+</main>
+
 <!-- 固定支出／訂閱 -->
 <main id="subs" class="wrap hidden">
   <div class="an-head">
@@ -1083,6 +1126,40 @@
   </form>
 </dialog>
 
+<dialog id="dlgLeave">
+  <form class="dlg" method="dialog" id="lvForm">
+    <div class="dlg-head"><h3 id="lvTitle">記請假</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+    <div class="field"><span class="flabel">假別</span><div class="cat-chips" id="lvTypeChips" role="radiogroup" aria-label="假別"></div></div>
+    <div class="field"><label for="lvDate">日期（請好幾天的話，填第一天）</label><input type="date" id="lvDate" required></div>
+    <div class="field">
+      <label for="lvHours">時數</label>
+      <div class="chips" id="lvHourChips"><button type="button" data-h="1">1 小時</button><button type="button" data-h="4">半天</button><button type="button" data-h="8">1 天</button><button type="button" data-h="16">2 天</button><button type="button" data-h="24">3 天</button></div>
+      <input class="num-in" type="number" id="lvHours" inputmode="decimal" step="0.5" min="0.5" required placeholder="小時" style="margin-top:8px">
+      <small>1 天 = 8 小時</small>
+    </div>
+    <div class="field"><label for="lvNote">備註</label><input id="lvNote" placeholder="選填，例如看醫生"></div>
+    <div class="info" id="lvCalc"></div>
+    <div class="dlg-actions sticky-act">
+      <button type="button" class="btn-danger hidden" id="lvDel">刪除</button>
+      <button type="button" class="btn-cancel" id="lvCancel">取消</button>
+      <button type="submit" class="btn-primary" id="lvSave">儲存</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgLvTypes">
+  <div class="dlg">
+    <div class="dlg-head"><h3>編輯假別</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+    <p class="cat-hint" style="margin:0">「每年天數」填了，就會顯示還剩幾天；超過之後照「超過後」的方式扣薪。病假和生理假這種要一起算天數的，在「天數合併」選另一個假別。</p>
+    <div class="ded-list" id="lvTypeList"></div>
+    <button class="btn-ghost" id="lvTypeAdd">＋ 新增假別</button>
+    <div class="dlg-actions sticky-act">
+      <button class="btn-cancel" id="lvTypeCancel">取消</button>
+      <button class="btn-primary" id="lvTypeSave">儲存</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="dlgPrice">
   <form class="dlg" method="dialog" id="prForm">
     <div class="dlg-head"><h3 id="prTitle">更新現價</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
@@ -1103,6 +1180,7 @@
       <button class="btn-ghost hidden" id="btnAssets"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.5"/><circle cx="16" cy="13.5" r="1.2" fill="currentColor"/></svg>資產總覽</button>
       <button class="btn-ghost hidden" id="btnBudget"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>預算規劃</button>
       <button class="btn-ghost hidden" id="btnStocks"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg>股票投資</button>
+      <button class="btn-ghost" id="btnLeave"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg>請假紀錄</button>
       <button class="btn-ghost" id="btnSubs"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/></svg>固定支出／訂閱</button>
       <button class="btn-ghost" id="btnAnalysis"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>消費分析（店家排行）</button>
       <div class="menu-sep"></div>
@@ -1338,15 +1416,59 @@ function payrollFromSettings(c) {
   const sal = BUDGET.salary;
   if (!sal || !(+sal.gross > 0)) return { gross: +BUDGET.income || 0, other: 0, items: [] };
   const k = keyOf(c);
-  return { gross: +sal.gross, other: +sal.other || 0,
-    items: (sal.items || []).map(it => ({ name: it.name, amt: dedAmt(it, +sal.gross, k, BUDGET.periodVar) })) };
+  const items = (sal.items || []).map(it => ({ name: it.name, amt: dedAmt(it, +sal.gross, k, BUDGET.periodVar) }));
+  const lv = leaveDeductForPay(c.y, c.m);
+  if (lv > 0) items.push({ name: "請假扣薪", amt: lv });
+  return { gross: +sal.gross, other: +sal.other || 0, items };
 }
 function incomeFromSettings(c) {
   const sal = BUDGET.salary;
   if (!sal || !(+sal.gross > 0)) return +BUDGET.income || 0;
-  const k = keyOf(c);
-  const ded = (sal.items || []).reduce((s, it) => s + dedAmt(it, +sal.gross, k, BUDGET.periodVar), 0);
-  return +sal.gross - ded + (+sal.other || 0);
+  return payNet(payrollFromSettings(c));
+}
+
+// ===== 請假 =====
+// 假別：pay＝上限內給薪比例（1 不扣、0.5 扣一半、0 全扣）；limit＝每年天數；group＝跟哪個假別合併計算天數；overPay＝超過上限後的給薪比例
+const DEFAULT_LEAVE_TYPES = [
+  { id: "annual", name: "特休", pay: 1, limit: null, group: "", overPay: 0 },
+  { id: "sick", name: "病假", pay: 0.5, limit: 30, group: "", overPay: 0 },
+  { id: "period", name: "生理假", pay: 0.5, limit: null, group: "sick", overPay: 0 },
+  { id: "personal", name: "事假", pay: 0, limit: 14, group: "", overPay: 0 },
+  { id: "official", name: "公假", pay: 1, limit: null, group: "", overPay: 0 },
+];
+let LEAVE = { types: DEFAULT_LEAVE_TYPES, lag: 1, records: [] }, unsubLeave = null;
+const LEAVE_COLORS = ["#2E8B57", "#C2417A", "#7A5BC2", "#E07A2E", "#2F6FB3", "#D4A21E", "#3A9E9A", "#9C6B3F", "#5B7C8A"];
+const lvType = id => LEAVE.types.find(t => t.id === id);
+const lvColor = id => { const i = LEAVE.types.findIndex(t => t.id === id); return LEAVE_COLORS[(i < 0 ? 8 : i) % LEAVE_COLORS.length]; };
+const lvQuotaId = t => (t?.group && lvType(t.group)) ? t.group : t?.id;          // 合併計算時，用主要假別的天數
+const fmtLv = h => { h = +h || 0; const d = Math.floor(h / 8), r = Math.round((h % 8) * 10) / 10; return d && r ? `${d} 天 ${r} 小時` : d ? `${d} 天` : `${r} 小時`; };
+const hourlyWage = () => (+BUDGET.salary?.gross || +BUDGET.income || 0) / 30 / 8;
+// 依日期順序算每一筆請假扣多少錢（同一年、同一個天數額度累計）
+function leaveCalc(records = LEAVE.records) {
+  const used = {}, out = {};
+  const hw = hourlyWage();
+  [...records].sort((a, b) => a.date.localeCompare(b.date) || (a.id > b.id ? 1 : -1)).forEach(r => {
+    const t = lvType(r.type) || { id: r.type, pay: 1, limit: null };
+    const q = lvQuotaId(t), lead = lvType(q) || t;
+    const key = r.date.slice(0, 4) + "|" + q;
+    const before = used[key] || 0, h = +r.hours || 0;
+    const capH = lead.limit ? +lead.limit * 8 : Infinity;
+    const inH = Math.max(0, Math.min(h, capH - before)), overH = h - inH;
+    used[key] = before + h;
+    const pay = t.pay == null || isNaN(+t.pay) ? 1 : +t.pay, over = lead.overPay == null || isNaN(+lead.overPay) ? 0 : +lead.overPay;
+    const ded = Math.round(inH * hw * (1 - pay) + overH * hw * (1 - over));
+    out[r.id] = { ded, inH, overH, usedAfter: before + h, capH };
+  });
+  return out;
+}
+// 某個月薪水要扣的請假金額（看「反映在哪個月」的設定）
+function leaveDeductForPay(y, m) {
+  if (!LEAVE.records?.length) return 0;
+  let ly = y, lm = m - (+LEAVE.lag || 0);
+  while (lm < 1) { lm += 12; ly--; }
+  const pre = `${ly}-${pad(lm)}`;
+  const calc = leaveCalc();
+  return LEAVE.records.filter(r => r.date.startsWith(pre)).reduce((s, r) => s + (calc[r.id]?.ded || 0), 0);
 }
 let BUDGET = { ...EMPTY_BUDGET }, unsubBudget = null;
 let ASSETS = { base: null, salary: {}, payroll: {} }, unsubAssets = null;
@@ -1370,10 +1492,10 @@ const keyOf = c => `${c.y}-${pad(c.m)}`;
 function backCycles(c, k) { let y = c.y, m = c.m - k; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } return { y, m }; }
 
 // ===== 頁面切換 =====
-const VIEWS = ["app", "plan", "analysis", "budget", "stocks", "subs", "assets"];
+const VIEWS = ["app", "plan", "analysis", "budget", "stocks", "subs", "assets", "leave"];
 // 分頁的根頁面；從根頁面進到子頁面（例如預算規劃），按返回會回到原本的分頁
 const ROOTS = ["app", "plan", "assets", "stocks"];
-const TAB_OF = { app: "app", plan: "plan", budget: "plan", assets: "assets", stocks: "assets", analysis: "more", subs: "more" };
+const TAB_OF = { app: "app", plan: "plan", budget: "plan", assets: "assets", stocks: "assets", analysis: "more", subs: "more", leave: "more" };
 let curView = "app", backTo = "app", assetsSeg = "assets";
 function showView(v) {
   if (!ROOTS.includes(v) && ROOTS.includes(curView)) backTo = curView;
@@ -1442,8 +1564,9 @@ $("btnLogin").onclick = async () => {
 
 // 換帳號或登出時，把上一個帳號留在畫面和記憶體裡的資料全部清掉
 function resetSession() {
-  [unsub, unsubCats, unsubRules, unsubBudget, unsubStocks, unsubStSet, unsubAssets].forEach(f => f && f());
-  unsub = unsubCats = unsubRules = unsubBudget = unsubStocks = unsubStSet = unsubAssets = null;
+  [unsub, unsubCats, unsubRules, unsubBudget, unsubStocks, unsubStSet, unsubAssets, unsubLeave].forEach(f => f && f());
+  unsub = unsubCats = unsubRules = unsubBudget = unsubStocks = unsubStSet = unsubAssets = unsubLeave = null;
+  LEAVE = { types: DEFAULT_LEAVE_TYPES, lag: 1, records: [] };
   ASSETS = { base: null, salary: {}, payroll: {} };
   txs = []; allTxs = null; cycleCache = {}; clearAn();
   storeRules = {}; CATEGORIES = DEFAULT_CATEGORIES; BUDGET = { ...EMPTY_BUDGET };
@@ -1453,7 +1576,7 @@ function resetSession() {
   anStart = null; anData = null; searchFrom = null;
   ym = { ...CUR };
   if (searching) { searching = false; $("searchBar").classList.add("hidden"); $("searchSum").classList.add("hidden"); $("receipt").classList.remove("hidden"); }
-  ["analysis", "budget", "stocks", "subs", "assets"].forEach(v => $(v).classList.add("hidden"));
+  ["analysis", "budget", "stocks", "subs", "assets", "leave"].forEach(v => $(v).classList.add("hidden"));
   document.querySelectorAll("dialog[open]").forEach(d => d.close());
   $("list").innerHTML = ""; $("total").textContent = "…"; $("trend").classList.add("hidden");
   $("budCard").classList.add("hidden");
@@ -1487,6 +1610,13 @@ onAuthStateChanged(auth, async u => {
     });
     unsubBudget = onSnapshot(doc(db, "users", u.uid, "settings", "budget"), snap => {
       BUDGET = { ...EMPTY_BUDGET, ...(snap.exists() ? snap.data() : {}) };
+      if (unsub && !searching) render();
+      scheduleAssets();
+    });
+    unsubLeave = onSnapshot(doc(db, "users", u.uid, "settings", "leave"), snap => {
+      const d = snap.exists() ? snap.data() : {};
+      LEAVE = { types: Array.isArray(d.types) && d.types.length ? d.types : DEFAULT_LEAVE_TYPES, lag: d.lag ?? 1, records: d.records || [] };
+      if (!$("leave").classList.contains("hidden")) renderLeave();
       if (unsub && !searching) render();
       scheduleAssets();
     });
@@ -2342,6 +2472,175 @@ $("baseForm").onsubmit = async e => {
     renderAssets();
   } catch (err) { toast("儲存失敗：" + err.code); }
   finally { $("btnBaseSave").disabled = false; }
+};
+
+// ===== 請假紀錄頁 =====
+let lvYearSel = new Date().getFullYear(), lvEditId = null, lvTypeSel = null;
+function openLeave() {
+  leaveMain();
+  showView("leave");
+  renderLeave();
+}
+$("btnLeave").onclick = openLeave;
+$("lvPrev").onclick = () => { lvYearSel--; renderLeave(); };
+$("lvNext").onclick = () => { lvYearSel++; renderLeave(); };
+function renderLeave() {
+  const y = String(lvYearSel);
+  $("lvYear").innerHTML = `${y} 年<small>1/1 – 12/31</small>`;
+  $("lvNext").disabled = lvYearSel >= new Date().getFullYear() + 1;
+  $("lvLag").value = String(LEAVE.lag ?? 1);
+  const calc = leaveCalc();
+  const recs = LEAVE.records.filter(r => r.date.startsWith(y));
+  // 每個假別：今年請了多少（合併計算的，額度看主要假別）
+  const usedBy = {}, quotaUsed = {};
+  recs.forEach(r => { usedBy[r.type] = (usedBy[r.type] || 0) + (+r.hours || 0); const q = lvQuotaId(lvType(r.type) || { id: r.type }); quotaUsed[q] = (quotaUsed[q] || 0) + (+r.hours || 0); });
+  const totalDed = recs.reduce((s, r) => s + (calc[r.id]?.ded || 0), 0);
+  const PAY = p => +p === 1 ? "不扣薪" : +p === 0.5 ? "扣一半薪水" : +p === 0 ? "全扣" : `給薪 ${Math.round(p * 100)}%`;
+  $("lvCards").innerHTML = LEAVE.types.map(t => {
+    const q = lvQuotaId(t), lead = lvType(q) || t, used = usedBy[t.id] || 0;
+    const cap = lead.limit ? +lead.limit * 8 : null, qUsed = quotaUsed[q] || 0;
+    const shared = q !== t.id;
+    return `<div class="lv-card" style="--c:${lvColor(t.id)}">
+      <span class="nm">${esc(t.name)}</span>
+      <span class="big">${used ? fmtLv(used).replace(/(\d+(?:\.\d+)?)/g, "$1").replace(" 天", "<small>天</small>").replace(" 小時", "<small>小時</small>") : "0<small>天</small>"}</span>
+      <span class="sub">${PAY(t.pay)}${cap ? `・${shared ? `和${esc(lead.name)}合計` : ""}一年 ${lead.limit} 天` : ""}</span>
+      ${cap ? `<span class="sub">${qUsed >= cap ? `<span class="uncat">已用完${qUsed > cap ? `，超過 ${fmtLv(qUsed - cap)}` : ""}</span>` : `還剩 <b>${fmtLv(cap - qUsed)}</b>`}</span>
+      <div class="prog"><span style="width:${Math.min(qUsed / cap * 100, 100).toFixed(1)}%"></span></div>` : ""}
+    </div>`;
+  }).join("") + `<div class="lv-total"><span>${y} 年請假共扣薪${hourlyWage() ? `（時薪約 ${fmt(hourlyWage())}）` : "<br>要先到預算規劃填本薪才算得出來"}</span><b>${fmt(totalDed)}</b></div>`;
+  const list = [...recs].sort((a, b) => b.date.localeCompare(a.date));
+  $("lvList").innerHTML = list.length ? list.map(r => {
+    const t = lvType(r.type), c = calc[r.id] || {};
+    const d = new Date(r.date + "T00:00:00");
+    return `<button class="item" data-id="${esc(r.id)}">
+      <span class="dot" style="background:${lvColor(r.type)}"></span>
+      <span style="min-width:0"><div class="store">${esc(t?.name || "已刪除的假別")}・${fmtLv(r.hours)}</div>
+        <div class="sub">${d.getMonth() + 1}/${d.getDate()}（${WEEK[d.getDay()]}）${c.overH ? `・<span class="uncat">超過天數上限 ${fmtLv(c.overH)}</span>` : ""}${r.note ? "・" + esc(r.note) : ""}</div></span>
+      <span class="amt-wrap"><span class="amt" style="font-size:18px;${c.ded ? "color:var(--danger)" : ""}">${c.ded ? "−" + fmt(c.ded) : "不扣"}</span></span>
+    </button>`;
+  }).join("") : `<div class="empty" style="padding:28px">${y} 年還沒有請假紀錄</div>`;
+  $("lvList").querySelectorAll(".item").forEach(b => b.onclick = () => openLeaveRec(LEAVE.records.find(r => r.id === b.dataset.id)));
+}
+async function saveLeave(patch) {
+  LEAVE = { ...LEAVE, ...patch };
+  await setDoc(doc(db, "users", user.uid, "settings", "leave"), { types: LEAVE.types, lag: LEAVE.lag, records: LEAVE.records, updatedAt: serverTimestamp() });
+  renderLeave();
+  cycleCache = {};
+  render();
+  scheduleAssets();
+}
+$("lvLag").onchange = () => saveLeave({ lag: +$("lvLag").value }).then(() => toast("已更新")).catch(e => toast("儲存失敗：" + e.code));
+
+// 記一筆請假
+function lvChips() {
+  $("lvTypeChips").innerHTML = LEAVE.types.map(t => `<button type="button" role="radio" data-v="${esc(t.id)}" style="--c:${lvColor(t.id)}"><i style="background:${lvColor(t.id)}"></i><span>${esc(t.name)}</span></button>`).join("");
+  $("lvTypeChips").querySelectorAll("button").forEach(b => b.onclick = () => { lvTypeSel = b.dataset.v; lvSync(); });
+}
+function lvSync() {
+  $("lvTypeChips").querySelectorAll("button").forEach(b => { const on = b.dataset.v === lvTypeSel; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
+  $("lvHourChips").querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.h === +$("lvHours").value));
+  // 預估扣多少
+  const h = +$("lvHours").value || 0, date = $("lvDate").value;
+  if (!lvTypeSel || !h || !date) { $("lvCalc").textContent = "選好假別、日期和時數，這裡會算出要扣多少薪水"; return; }
+  const tmp = { id: lvEditId || "__new", type: lvTypeSel, date, hours: h };
+  const recs = LEAVE.records.filter(r => r.id !== lvEditId).concat(tmp);
+  const c = leaveCalc(recs)[tmp.id];
+  const t = lvType(lvTypeSel), lead = lvType(lvQuotaId(t)) || t;
+  let txt = c.ded ? `這次會扣 <b>${fmt(c.ded)}</b> 元` : "這次不會扣薪";
+  if (c.capH !== Infinity) txt += `。${lead.name}${lead.id !== t.id ? "（合併）" : ""}今年到這次為止用了 ${fmtLv(c.usedAfter)}，上限 ${lead.limit} 天${c.overH ? `，<span class="uncat">其中 ${fmtLv(c.overH)} 超過上限</span>` : ""}`;
+  if (c.ded && !hourlyWage()) txt = "要先到「預算規劃」填本薪，才算得出扣多少";
+  $("lvCalc").innerHTML = txt;
+}
+function openLeaveRec(r) {
+  lvEditId = r?.id || null;
+  $("lvTitle").textContent = r ? "修改請假" : "記請假";
+  lvTypeSel = r?.type || LEAVE.types[0]?.id;
+  $("lvDate").value = r?.date || ymd(new Date());
+  $("lvHours").value = r?.hours || 8;
+  $("lvNote").value = r?.note || "";
+  $("lvDel").classList.toggle("hidden", !r);
+  lvChips();
+  lvSync();
+  $("dlgLeave").showModal();
+}
+$("btnLvAdd").onclick = () => openLeaveRec();
+$("lvHourChips").querySelectorAll("button").forEach(b => b.onclick = () => { $("lvHours").value = b.dataset.h; lvSync(); });
+["lvHours", "lvDate"].forEach(id => $(id).addEventListener("input", lvSync));
+$("lvCancel").onclick = () => $("dlgLeave").close();
+$("lvForm").onsubmit = async e => {
+  e.preventDefault();
+  const rec = { id: lvEditId || "lv" + Date.now().toString(36), type: lvTypeSel, date: $("lvDate").value, hours: +$("lvHours").value || 0, note: $("lvNote").value.trim() };
+  if (!rec.type || !rec.date || !rec.hours) return toast("請選假別、日期和時數");
+  const records = LEAVE.records.filter(r => r.id !== lvEditId).concat(rec);
+  $("lvSave").disabled = true;
+  try { await saveLeave({ records }); lvYearSel = +rec.date.slice(0, 4); renderLeave(); $("dlgLeave").close(); toast("已儲存"); }
+  catch (err) { toast("儲存失敗：" + err.code); }
+  finally { $("lvSave").disabled = false; }
+};
+$("lvDel").onclick = async () => {
+  if (!lvEditId || !confirm("確定要刪除這筆請假嗎？")) return;
+  try { await saveLeave({ records: LEAVE.records.filter(r => r.id !== lvEditId) }); $("dlgLeave").close(); toast("已刪除"); }
+  catch (err) { toast("刪除失敗：" + err.code); }
+};
+
+// 編輯假別
+function lvTypeRow(t) {
+  const row = document.createElement("div");
+  row.className = "lv-type";
+  row.dataset.id = t.id;
+  row.innerHTML = `
+    <div class="r1">
+      <input type="text" class="t-name" maxlength="10" placeholder="假別名稱，例如婚假" value="${esc(t.name || "")}" aria-label="假別名稱">
+      <select class="t-pay" aria-label="扣薪方式"><option value="1">不扣薪</option><option value="0.5">扣一半</option><option value="0">全扣</option></select>
+      <button type="button" class="del" aria-label="刪除這個假別">×</button>
+    </div>
+    <div class="r2">
+      <label>每年天數（空白＝不限）<input type="number" class="t-limit" inputmode="numeric" min="0" placeholder="不限" value="${t.limit ?? ""}"></label>
+      <label>超過後<select class="t-over"><option value="0">全扣</option><option value="0.5">扣一半</option><option value="1">不扣薪</option></select></label>
+      <label style="grid-column:1/-1">天數合併<select class="t-group"></select></label>
+    </div>`;
+  row.querySelector(".t-pay").value = String(t.pay ?? 1);
+  row.querySelector(".t-over").value = String(t.overPay ?? 0);
+  row.querySelector(".del").onclick = () => { row.remove(); lvGroupOpts(); };
+  row.querySelector(".t-name").addEventListener("input", lvGroupOpts);
+  row.dataset.group = t.group || "";
+  return row;
+}
+function lvGroupOpts() {
+  const rows = [...$("lvTypeList").children];
+  rows.forEach(r => {
+    const sel = r.querySelector(".t-group"), cur = sel.value || r.dataset.group || "";
+    sel.innerHTML = `<option value="">獨立計算</option>` + rows.filter(o => o !== r).map(o => `<option value="${esc(o.dataset.id)}">和「${esc(o.querySelector(".t-name").value || "未命名")}」合併計算</option>`).join("");
+    sel.value = [...sel.options].some(o => o.value === cur) ? cur : "";
+    sel.onchange = () => { r.dataset.group = sel.value; };
+  });
+}
+$("btnLvTypes").onclick = () => {
+  $("lvTypeList").innerHTML = "";
+  LEAVE.types.forEach(t => $("lvTypeList").append(lvTypeRow(t)));
+  lvGroupOpts();
+  $("dlgLvTypes").showModal();
+};
+$("lvTypeAdd").onclick = () => {
+  const r = lvTypeRow({ id: "t" + Date.now().toString(36), name: "", pay: 1 });
+  $("lvTypeList").append(r); lvGroupOpts(); r.querySelector(".t-name").focus();
+};
+$("lvTypeCancel").onclick = () => $("dlgLvTypes").close();
+$("lvTypeSave").onclick = async () => {
+  const types = [...$("lvTypeList").children].map(r => ({
+    id: r.dataset.id, name: r.querySelector(".t-name").value.trim(), pay: +r.querySelector(".t-pay").value,
+    limit: r.querySelector(".t-limit").value === "" ? null : +r.querySelector(".t-limit").value,
+    overPay: +r.querySelector(".t-over").value, group: r.querySelector(".t-group").value,
+  })).filter(t => t.name);
+  if (!types.length) return toast("至少要有一個假別");
+  const names = types.map(t => t.name);
+  if (new Set(names).size !== names.length) return toast("假別名稱重複了");
+  // 合併對象被刪掉，或互相合併時，改回獨立計算
+  types.forEach(t => { const g = types.find(x => x.id === t.group); if (!g || g.group) t.group = ""; });
+  const removed = LEAVE.types.filter(t => !types.some(x => x.id === t.id)).filter(t => LEAVE.records.some(r => r.type === t.id));
+  if (removed.length && !confirm(`「${removed.map(t => t.name).join("、")}」還有請假紀錄，刪除假別後那些紀錄會變成「已刪除的假別」、不扣薪。確定嗎？`)) return;
+  try { await saveLeave({ types }); $("dlgLvTypes").close(); toast("假別已儲存"); }
+  catch (err) { toast("儲存失敗：" + err.code); }
 };
 
 // ===== 預算規劃 =====
