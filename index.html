@@ -706,6 +706,20 @@
   #dlgTx .dlg-actions .btn-primary { flex: 2; }
   #dlgTx .dlg-actions .btn-danger { flex: 0 0 auto; order: 0; flex-basis: auto; margin-right: 0; padding: 0 16px; }
   @media (max-width: 520px) { #dlgTx .dlg { padding-bottom: 20px; } #dlgTx .dlg-actions { flex-wrap: nowrap; } }
+
+  /* 薪資紀錄 */
+  .pay-row { display: grid; grid-template-columns: 1fr auto 18px; gap: 10px; align-items: center; width: 100%; min-height: 56px; padding: 8px 12px; border: 0; border-radius: 12px; background: var(--bg); text-align: left; }
+  .pay-row:hover { background: var(--accent-soft); }
+  .pay-row small { display: block; font-size: 12px; color: var(--muted); }
+  .pay-row b { font-family: var(--num); font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+  .pay-row svg { width: 16px; height: 16px; color: var(--muted); }
+  .pay-row .st { font-size: 11px; padding: 0 6px; border-radius: 6px; margin-left: 6px; background: var(--paper); color: var(--muted); }
+  .pay-row .st.ok { background: var(--accent-soft); color: var(--accent); }
+  .pay-row .st.wait { background: var(--gold-soft); color: var(--gold); }
+  .pay-item { display: grid; grid-template-columns: 1fr 120px 32px; gap: 8px; align-items: center; }
+  .pay-item input[type=text] { border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; background: var(--bg); min-width: 0; width: 100%; }
+  .pay-item .del { width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--danger-soft); color: var(--danger); font-size: 16px; line-height: 1; }
+  #dlgPay .dlg-actions .btn-primary { flex: 2; }
 </style>
 </head>
 <body>
@@ -908,8 +922,8 @@
     <div class="as-calc" id="asCalc"></div>
   </div>
   <div class="an-box" id="asSalBox">
-    <p class="sec-title" style="margin:0">每月 1 號薪水</p>
-    <p class="cat-hint" style="margin:0">空白＝用預算規劃算出來的實發。那個月薪水不一樣（例如用餐費不同、有獎金），就直接填實際入帳的金額。</p>
+    <p class="sec-title" style="margin:0">薪資紀錄（近 12 個月）</p>
+    <p class="cat-hint" style="margin:0">每月 1 號自動加進現金。點一個月份可以看完整薪資單；跟實際拿到的不一樣，就照薪資單改，之後隨時都能回來修正。</p>
     <div class="ded-list" id="asSal"></div>
   </div>
   <div class="an-box">
@@ -1046,6 +1060,25 @@
     <div class="dlg-actions">
       <button type="button" class="btn-cancel" id="btnBaseCancel">取消</button>
       <button type="submit" class="btn-primary" id="btnBaseSave">儲存</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgPay">
+  <form class="dlg" method="dialog" id="payForm">
+    <div class="dlg-head"><h3 id="payTitle">薪資</h3><button type="button" class="x-btn" data-close aria-label="關閉"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+    <div class="info" id="payState"></div>
+    <div class="row2">
+      <div class="field"><label for="pGross">本薪（應發）</label><input class="num-in" type="number" id="pGross" inputmode="numeric" min="0"></div>
+      <div class="field"><label for="pOther">其他收入（獎金、加班費）</label><input class="num-in" type="number" id="pOther" inputmode="numeric" min="0" placeholder="0"></div>
+    </div>
+    <div class="field-head"><span class="flabel">扣款</span><button type="button" class="link-btn" id="pAdd">＋ 新增項目</button></div>
+    <div class="ded-list" id="pItems"></div>
+    <div class="net-sum" id="pNet"></div>
+    <div class="dlg-actions sticky-act">
+      <button type="button" class="btn-danger hidden" id="pReset">回到預設</button>
+      <button type="button" class="btn-cancel" id="pCancel">取消</button>
+      <button type="submit" class="btn-primary" id="pSave">儲存</button>
     </div>
   </form>
 </dialog>
@@ -1292,7 +1325,23 @@ function dedAmt(it, gross, cycleKey, periodVar) {
   return v !== undefined && v !== "" && v !== null ? +v : base;
 }
 // 某一期的實際收入：有填薪資就用「本薪 − 扣款 + 其他收入」，沒填就用手動輸入的每月收入
+// 某一期的薪水：有「薪資紀錄」（那個月實際拿到的）就用紀錄，沒有就照預算規劃的設定算
+// 帳單期 c 裡面的 1 號一定是 c.y 年 c.m 月 1 號，所以用同一個 key
 function incomeFor(c) {
+  const rec = typeof ASSETS !== "undefined" && ASSETS.payroll?.[keyOf(c)];
+  if (rec) return payNet(rec);
+  return incomeFromSettings(c);
+}
+const payNet = r => (+r.gross || 0) + (+r.other || 0) - (r.items || []).reduce((s, it) => s + (+it.amt || 0), 0);
+// 照預算規劃的設定算出某個月的完整薪資單
+function payrollFromSettings(c) {
+  const sal = BUDGET.salary;
+  if (!sal || !(+sal.gross > 0)) return { gross: +BUDGET.income || 0, other: 0, items: [] };
+  const k = keyOf(c);
+  return { gross: +sal.gross, other: +sal.other || 0,
+    items: (sal.items || []).map(it => ({ name: it.name, amt: dedAmt(it, +sal.gross, k, BUDGET.periodVar) })) };
+}
+function incomeFromSettings(c) {
   const sal = BUDGET.salary;
   if (!sal || !(+sal.gross > 0)) return +BUDGET.income || 0;
   const k = keyOf(c);
@@ -1300,7 +1349,7 @@ function incomeFor(c) {
   return +sal.gross - ded + (+sal.other || 0);
 }
 let BUDGET = { ...EMPTY_BUDGET }, unsubBudget = null;
-let ASSETS = { base: null, salary: {} }, unsubAssets = null;
+let ASSETS = { base: null, salary: {}, payroll: {} }, unsubAssets = null;
 const isAbroad = t => !!t.region && t.region !== "TW";
 const net = t => (+t.amount || 0) - (+t.paidBack || 0);     // 我實際花的 = 金額 − 別人分攤
 const isTwd = t => !t.currency || t.currency === "TWD";
@@ -1395,7 +1444,7 @@ $("btnLogin").onclick = async () => {
 function resetSession() {
   [unsub, unsubCats, unsubRules, unsubBudget, unsubStocks, unsubStSet, unsubAssets].forEach(f => f && f());
   unsub = unsubCats = unsubRules = unsubBudget = unsubStocks = unsubStSet = unsubAssets = null;
-  ASSETS = { base: null, salary: {} };
+  ASSETS = { base: null, salary: {}, payroll: {} };
   txs = []; allTxs = null; cycleCache = {}; clearAn();
   storeRules = {}; CATEGORIES = DEFAULT_CATEGORIES; BUDGET = { ...EMPTY_BUDGET };
   stockTxs = []; stocksLoaded = false; stockSet = { prices: {}, discount: 10, minFee: 20, feeMode: "zero" };
@@ -1443,7 +1492,8 @@ onAuthStateChanged(auth, async u => {
     });
     unsubAssets = onSnapshot(doc(db, "users", u.uid, "settings", "assets"), snap => {
       const d = snap.exists() ? snap.data() : {};
-      ASSETS = { base: d.base || null, salary: d.salary || {} };
+      ASSETS = { base: d.base || null, salary: d.salary || {}, payroll: d.payroll || {} };
+      if (unsub && !searching) render();          // 薪資紀錄會影響預算
       scheduleAssets();
     });
     // 讀這個人的帳單結帳日，再開始載入資料
@@ -1984,8 +2034,13 @@ $("btnSubs").onclick = openSubs;
 // 做法：你輸入某一天的「存款、還沒繳的卡費、別人欠你的錢」當起點，
 // 之後自動 ＋ 每月 1 號薪水、− 固定支出、− 記到的消費（刷卡的算欠款，所以一樣扣），再加上股票市值
 const ymKey = (y, m) => `${y}-${pad(m)}`;
-const defaultSalary = (y, m) => incomeFor(cycleOf(y, m, 1));
-const salaryOf = (y, m) => { const v = ASSETS.salary?.[ymKey(y, m)]; return v !== undefined && v !== null && v !== "" ? +v : defaultSalary(y, m); };
+const defaultSalary = (y, m) => incomeFromSettings(cycleOf(y, m, 1));
+const salaryOf = (y, m) => {
+  const k = ymKey(y, m);
+  if (ASSETS.payroll?.[k]) return payNet(ASSETS.payroll[k]);
+  const v = ASSETS.salary?.[k];                     // 舊版只存實發金額
+  return v !== undefined && v !== null && v !== "" ? +v : incomeFromSettings(cycleOf(y, m, 1));
+};
 // after < 日期 ≤ until 的每月 1 號
 function firstsBetween(after, until) {
   const out = [];
@@ -2130,34 +2185,97 @@ async function renderAssets() {
 }
 
 function renderSalaryRows(base, today) {
-  // 從起點之後的每月 1 號，到下一次發薪（最多列 12 個月）
+  // 最近 12 個月的 1 號（包含下一次發薪）
   const t = new Date();
-  const next = t.getDate() === 1 ? ymd(t) : `${t.getMonth() === 11 ? t.getFullYear() + 1 : t.getFullYear()}-${pad(t.getMonth() === 11 ? 1 : t.getMonth() + 2)}-01`;
-  const from = base ? base.date : ymd(new Date(t.getFullYear(), t.getMonth(), 0));
-  const list = firstsBetween(from, next).slice(-12).reverse();
-  if (!list.length) { $("asSal").innerHTML = `<p class="cat-hint" style="margin:0">還沒有要入帳的薪水。</p>`; return; }
-  const focused = document.activeElement?.dataset?.ym;
+  const ny = t.getDate() === 1 ? t.getFullYear() : (t.getMonth() === 11 ? t.getFullYear() + 1 : t.getFullYear());
+  const nm = t.getDate() === 1 ? t.getMonth() + 1 : (t.getMonth() === 11 ? 1 : t.getMonth() + 2);
+  const list = [];
+  for (let i = 0; i < 12; i++) { let y = ny, m = nm - i; while (m < 1) { m += 12; y--; } list.push({ y, m, d: `${y}-${pad(m)}-01` }); }
+  const CHEV = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l5 5-5 5"/></svg>';
   $("asSal").innerHTML = list.map(f => {
-    const k = ymKey(f.y, f.m), v = ASSETS.salary?.[k];
-    const done = f.d <= today;
-    return `<div class="sal-row">
-      <span>${f.y}/${f.m}/1<span class="st ${done ? "" : "wait"}">${done ? "已入帳" : "預計"}</span>
-        <small>預設 ${fmt(defaultSalary(f.y, f.m))}</small></span>
-      <input class="num-in" type="number" inputmode="numeric" min="0" data-ym="${k}" placeholder="${fmt(defaultSalary(f.y, f.m))}" value="${v ?? ""}" aria-label="${f.m} 月薪水">
-    </div>`;
+    const k = ymKey(f.y, f.m), rec = ASSETS.payroll?.[k], old = ASSETS.salary?.[k];
+    const future = f.d > today;
+    const st = future ? `<span class="st wait">預計</span>` : rec ? `<span class="st ok">已確認</span>` : old != null ? `<span class="st ok">已修改</span>` : `<span class="st">照設定算</span>`;
+    const counted = base && f.d > base.date && !future;
+    return `<button type="button" class="pay-row" data-k="${k}">
+      <span>${f.y} 年 ${f.m} 月${st}<small>${future ? "還沒入帳" : counted ? "已加進資產總覽的現金" : base && f.d <= base.date ? "已包含在你輸入的存款裡" : "已入帳"}</small></span>
+      <b>${fmt(salaryOf(f.y, f.m))}</b>${CHEV}
+    </button>`;
   }).join("");
-  $("asSal").querySelectorAll("input").forEach(i => i.onchange = async () => {
-    const val = i.value === "" ? null : +i.value;
-    const salary = { ...(ASSETS.salary || {}) };
-    if (val === null) delete salary[i.dataset.ym]; else salary[i.dataset.ym] = val;
-    ASSETS.salary = salary;
-    try {
-      await setDoc(doc(db, "users", user.uid, "settings", "assets"), { salary, updatedAt: serverTimestamp() }, { merge: true });
-      toast("薪水已更新");
-    } catch (e) { toast("儲存失敗：" + e.code); }
-  });
-  if (focused) $("asSal").querySelector(`[data-ym="${focused}"]`)?.focus();
+  $("asSal").querySelectorAll(".pay-row").forEach(b => b.onclick = () => openPay(b.dataset.k));
 }
+
+// ===== 某個月的完整薪資單 =====
+let payKey = null;
+function payItemRow(name = "", amt = "") {
+  const row = document.createElement("div");
+  row.className = "pay-item";
+  row.innerHTML = `<input type="text" class="pi-name" placeholder="項目，例如所得稅" maxlength="12" value="${esc(name)}" aria-label="扣款項目">
+    <input type="number" class="num-in pi-amt" inputmode="numeric" min="0" placeholder="0" value="${amt === "" ? "" : +amt}" aria-label="金額">
+    <button type="button" class="del" aria-label="刪除這一項">×</button>`;
+  row.querySelector(".del").onclick = () => { row.remove(); payCalc(); };
+  row.querySelectorAll("input").forEach(i => i.addEventListener("input", payCalc));
+  return row;
+}
+function readPay() {
+  return {
+    gross: +$("pGross").value || 0, other: +$("pOther").value || 0,
+    items: [...$("pItems").children].map(r => ({ name: r.querySelector(".pi-name").value.trim(), amt: +r.querySelector(".pi-amt").value || 0 }))
+      .filter(it => it.name || it.amt),
+  };
+}
+function payCalc() {
+  const r = readPay(), ded = r.items.reduce((s, it) => s + it.amt, 0);
+  $("pNet").innerHTML = `<span>本薪 <b>${fmt(r.gross)}</b>${r.other ? ` ＋ 其他 <b>${fmt(r.other)}</b>` : ""} − 扣款 <b>${fmt(ded)}</b></span>
+    <span>實際拿到 <b class="big">${fmt(payNet(r))}</b></span>`;
+}
+function openPay(k) {
+  payKey = k;
+  const [y, m] = k.split("-").map(Number);
+  const rec = ASSETS.payroll?.[k];
+  const r = rec || payrollFromSettings({ y, m });
+  $("payTitle").textContent = `${y} 年 ${m} 月薪資`;
+  const old = ASSETS.salary?.[k];
+  $("payState").innerHTML = rec ? "這是你確認過的薪資，跟薪資單不一樣可以直接改。"
+    : `目前是照「預算規劃」的設定算出來的${old != null ? `（之前改過實發為 ${fmt(old)}）` : ""}。跟薪資單對一下，不一樣就改，按儲存後會記住這個月的實際金額。`;
+  $("pGross").value = r.gross || "";
+  $("pOther").value = r.other || "";
+  $("pItems").innerHTML = "";
+  (r.items || []).forEach(it => $("pItems").append(payItemRow(it.name, it.amt)));
+  $("pReset").classList.toggle("hidden", !rec && old == null);
+  payCalc();
+  $("dlgPay").showModal();
+}
+["pGross", "pOther"].forEach(id => $(id).addEventListener("input", payCalc));
+$("pAdd").onclick = () => { const r = payItemRow(); $("pItems").append(r); r.querySelector(".pi-name").focus(); };
+$("pCancel").onclick = () => $("dlgPay").close();
+async function savePayroll(payroll, salary) {
+  await setDoc(doc(db, "users", user.uid, "settings", "assets"), { payroll, salary, updatedAt: serverTimestamp() }, { merge: true });
+  ASSETS.payroll = payroll; ASSETS.salary = salary;
+  cycleCache = {};
+  render();
+  renderAssets();
+}
+$("payForm").onsubmit = async e => {
+  e.preventDefault();
+  const r = readPay();
+  if (!r.gross) return toast("請填本薪");
+  const payroll = { ...(ASSETS.payroll || {}), [payKey]: r };
+  Object.keys(payroll).sort().slice(0, -12).forEach(k => delete payroll[k]);   // 只保留最近 12 個月
+  const salary = { ...(ASSETS.salary || {}) };
+  delete salary[payKey];
+  $("pSave").disabled = true;
+  try { await savePayroll(payroll, salary); $("dlgPay").close(); toast(`已儲存，實際拿到 ${fmt(payNet(r))}`); }
+  catch (err) { toast("儲存失敗：" + err.code); }
+  finally { $("pSave").disabled = false; }
+};
+$("pReset").onclick = async () => {
+  if (!confirm("要刪除這個月的紀錄，改回照預算規劃的設定算嗎？")) return;
+  const payroll = { ...(ASSETS.payroll || {}) }, salary = { ...(ASSETS.salary || {}) };
+  delete payroll[payKey]; delete salary[payKey];
+  try { await savePayroll(payroll, salary); $("dlgPay").close(); toast("已改回預設"); }
+  catch (err) { toast("儲存失敗：" + err.code); }
+};
 
 async function renderSavings(token) {
   const list = [];
