@@ -975,9 +975,13 @@
   <div class="an-box" style="margin-top:18px">
     <div class="field-head"><p class="sec-title" style="margin:0">假別設定</p><button class="link-btn" id="btnLvTypes">編輯假別</button></div>
     <div class="field">
-      <label for="lvLag">請假扣的錢，預設扣在哪個月的薪水（每一筆也可以單獨改）</label>
-      <select id="lvLag"></select>
-      <select id="lvFixM" class="hidden" style="margin-top:8px" aria-label="每年固定扣在幾月"></select>
+      <label for="lvLag">請假扣的錢，扣在什麼時候</label>
+      <select id="lvLag">
+        <option value="0">當月的薪水</option>
+        <option value="1">下個月的薪水</option>
+        <option value="fixed:Y-12">年底一起扣（當年 12 月的薪水）</option>
+        <option value="fixed:N-1">隔年 1 月一起扣</option>
+      </select>
     </div>
     <p class="cat-hint" style="margin:0">扣薪照勞基法常用算法：時薪＝本薪 ÷ 30 ÷ 8。天數每年 1/1 重新計算。實際扣多少以公司薪資單為準，不一樣可以到「資產 → 薪資紀錄」修正那個月。</p>
   </div>
@@ -1145,11 +1149,14 @@
       <small>1 天 = 8 小時</small>
     </div>
     <div class="field"><label for="lvNote">備註</label><input id="lvNote" placeholder="選填，例如看醫生"></div>
-    <div class="row2">
-      <div class="field"><label for="lvPayM">扣在哪個月的薪水</label><select id="lvPayM"></select></div>
-      <div class="field"><label for="lvDedIn">實際扣多少</label><input class="num-in" type="number" id="lvDedIn" inputmode="numeric" min="0" placeholder="自動算"><small>照薪資單填，空白＝自動算</small></div>
-    </div>
     <div class="info" id="lvCalc"></div>
+    <details class="more" id="lvMore">
+      <summary>這筆扣的月份或金額不一樣？<span id="lvMoreSum"></span></summary>
+      <div class="row2" style="margin:0 12px">
+        <div class="field"><label for="lvPayM">扣在哪個月的薪水</label><input type="month" id="lvPayM"><small>空白＝照設定</small></div>
+        <div class="field"><label for="lvDedIn">實際扣多少</label><input class="num-in" type="number" id="lvDedIn" inputmode="numeric" min="0" placeholder="自動算"><small>空白＝自動算</small></div>
+      </div>
+    </details>
     <div class="dlg-actions sticky-act">
       <button type="button" class="btn-danger hidden" id="lvDel">刪除</button>
       <button type="button" class="btn-cancel" id="lvCancel">取消</button>
@@ -1494,11 +1501,9 @@ function leaveCalc(records = LEAVE.records) {
 function leavePayMonth(r) {
   if (r.payMonth) return r.payMonth;
   let y = +r.date.slice(0, 4), m = +r.date.slice(5, 7);
-  if (LEAVE.lag === "fixed") {                     // 請假之後遇到的第一個指定月份（薪水 1 號發，所以從下個月開始找）
-    const fm = +LEAVE.fixM || 1;
-    m++; if (m > 12) { m = 1; y++; }
-    while (m !== fm) { m++; if (m > 12) { m = 1; y++; } }
-    return `${y}-${pad(m)}`;
+  if (LEAVE.lag === "fixed") {                     // 整年的請假一起扣：當年（Y）或隔年（N）的某個月
+    const [w, fm] = String(LEAVE.fixRule || "Y-12").split("-");
+    return `${w === "N" ? y + 1 : y}-${pad(+fm || 12)}`;
   }
   m += +LEAVE.lag || 0;
   while (m > 12) { m -= 12; y++; }
@@ -1656,7 +1661,7 @@ onAuthStateChanged(auth, async u => {
     });
     unsubLeave = onSnapshot(doc(db, "users", u.uid, "settings", "leave"), snap => {
       const d = snap.exists() ? snap.data() : {};
-      LEAVE = { types: Array.isArray(d.types) && d.types.length ? d.types : DEFAULT_LEAVE_TYPES, lag: d.lag ?? 1, fixM: d.fixM || 1, records: d.records || [] };
+      LEAVE = { types: Array.isArray(d.types) && d.types.length ? d.types : DEFAULT_LEAVE_TYPES, lag: d.lag ?? 1, fixRule: d.fixRule || "Y-12", records: d.records || [] };
       if (!$("leave").classList.contains("hidden")) renderLeave();
       if (unsub && !searching) render();
       scheduleAssets();
@@ -2529,9 +2534,11 @@ function renderLeave() {
   const y = String(lvYearSel);
   $("lvYear").innerHTML = `${y} 年<small>1/1 – 12/31</small>`;
   $("lvNext").disabled = lvYearSel >= new Date().getFullYear() + 1;
-  $("lvLag").value = String(LEAVE.lag ?? 1);
-  $("lvFixM").value = String(LEAVE.fixM || 1);
-  $("lvFixM").classList.toggle("hidden", LEAVE.lag !== "fixed");
+  // 舊設定（例如 3 個月後）不在選項裡時，暫時加一個選項顯示
+  const lv = lagValue();
+  $("lvLag").querySelectorAll("[data-old]").forEach(o => o.remove());
+  if (![...$("lvLag").options].some(o => o.value === lv)) $("lvLag").insertAdjacentHTML("beforeend", `<option data-old value="${esc(lv)}">${LEAVE.lag === "fixed" ? "整年一起扣（舊設定）" : `${LEAVE.lag} 個月後的薪水（舊設定）`}</option>`);
+  $("lvLag").value = lv;
   const calc = leaveCalc();
   const recs = LEAVE.records.filter(r => r.date.startsWith(y));
   // 每個假別：今年請了多少（合併計算的，額度看主要假別）
@@ -2550,7 +2557,7 @@ function renderLeave() {
       ${cap ? `<span class="sub">${qUsed >= cap ? `<span class="uncat">已用完${qUsed > cap ? `，超過 ${fmtLv(qUsed - cap)}` : ""}</span>` : `還剩 <b>${fmtLv(cap - qUsed)}</b>`}</span>
       <div class="prog"><span style="width:${Math.min(qUsed / cap * 100, 100).toFixed(1)}%"></span></div>` : ""}
     </div>`;
-  }).join("") + `<div class="lv-total"><span>${y} 年請假共扣薪${hourlyWage() ? `（時薪約 ${fmt(hourlyWage())}）` : "<br>要先到預算規劃填本薪才算得出來"}</span><b>${fmt(totalDed)}</b></div>`;
+  }).join("") + `<div class="lv-total"><span>${y} 年請假共扣薪${hourlyWage() ? `（時薪約 ${fmt(hourlyWage())}）` : "<br>要先到預算規劃填本薪才算得出來"}${LEAVE.lag === "fixed" && totalDed ? `<br>會在 ${payMonthLabel(leavePayMonth({ date: y + "-06-01" }), "0000")}的薪水一起扣` : ""}</span><b>${fmt(totalDed)}</b></div>`;
   const list = [...recs].sort((a, b) => b.date.localeCompare(a.date));
   $("lvList").innerHTML = list.length ? list.map(r => {
     const t = lvType(r.type), c = calc[r.id] || {};
@@ -2566,23 +2573,19 @@ function renderLeave() {
 }
 async function saveLeave(patch) {
   LEAVE = { ...LEAVE, ...patch };
-  await setDoc(doc(db, "users", user.uid, "settings", "leave"), { types: LEAVE.types, lag: LEAVE.lag, fixM: LEAVE.fixM || 1, records: LEAVE.records, updatedAt: serverTimestamp() });
+  await setDoc(doc(db, "users", user.uid, "settings", "leave"), { types: LEAVE.types, lag: LEAVE.lag, fixRule: LEAVE.fixRule || "Y-12", records: LEAVE.records, updatedAt: serverTimestamp() });
   renderLeave();
   cycleCache = {};
   render();
   scheduleAssets();
 }
-// 預設扣在哪個月：當月、1～12 個月後，或每年固定某個月一起扣
-$("lvLag").innerHTML = `<option value="0">當月薪水（10 月請假扣 10/1）</option>` +
-  Array.from({ length: 12 }, (_, i) => { const n = i + 1, m = (10 + n - 1) % 12 + 1; return `<option value="${n}">${n === 1 ? "下個月" : n + " 個月後的"}薪水（10 月請假扣 ${m}/1）</option>`; }).join("") +
-  `<option value="fixed">每年固定在某個月一起扣</option>`;
-$("lvFixM").innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">請假之後的第一個 ${i + 1} 月薪水</option>`).join("");
-const lagFromUI = () => $("lvLag").value === "fixed" ? "fixed" : +$("lvLag").value;
+// 請假扣薪的時間：只留常見的 4 種
+const lagValue = () => LEAVE.lag === "fixed" ? `fixed:${LEAVE.fixRule || "Y-12"}` : String(LEAVE.lag ?? 1);
 $("lvLag").onchange = () => {
-  $("lvFixM").classList.toggle("hidden", $("lvLag").value !== "fixed");
-  saveLeave({ lag: lagFromUI(), fixM: +$("lvFixM").value || 1 }).then(() => toast("已更新")).catch(e => toast("儲存失敗：" + e.code));
+  const v = $("lvLag").value;
+  const patch = v.startsWith("fixed:") ? { lag: "fixed", fixRule: v.slice(6) } : { lag: +v };
+  saveLeave(patch).then(() => toast("已更新")).catch(e => toast("儲存失敗：" + e.code));
 };
-$("lvFixM").onchange = () => saveLeave({ fixM: +$("lvFixM").value }).then(() => toast("已更新")).catch(e => toast("儲存失敗：" + e.code));
 
 // 記一筆請假
 function lvChips() {
@@ -2595,18 +2598,14 @@ function lvSync() {
   // 預估扣多少
   const h = +$("lvHours").value || 0, date = $("lvDate").value;
   if (!lvTypeSel || !h || !date) { $("lvCalc").textContent = "選好假別、日期和時數，這裡會算出要扣多少薪水"; return; }
-  // 扣在哪個月：選項＝請假當月起 13 個月，第一個是「照預設」
-  const keepPM = $("lvPayM").value;
   const autoPM = leavePayMonth({ date });
-  let opts = `<option value="">照預設（${payMonthLabel(autoPM, date)}薪水）</option>`;
-  for (let i = 0; i <= 12; i++) { let y = +date.slice(0, 4), m = +date.slice(5, 7) + i; while (m > 12) { m -= 12; y++; } opts += `<option value="${y}-${pad(m)}">${y === +date.slice(0, 4) ? "" : y + " 年 "}${m} 月薪水</option>`; }
-  $("lvPayM").innerHTML = opts;
-  $("lvPayM").value = [...$("lvPayM").options].some(o => o.value === keepPM) ? keepPM : "";
+  $("lvPayM").placeholder = autoPM;
   const tmp = { id: lvEditId || "__new", type: lvTypeSel, date, hours: h, ded: $("lvDedIn").value, payMonth: $("lvPayM").value };
   const recs = LEAVE.records.filter(r => r.id !== lvEditId).concat(tmp);
   const c = leaveCalc(recs)[tmp.id];
   const t = lvType(lvTypeSel), lead = lvType(lvQuotaId(t)) || t;
   $("lvDedIn").placeholder = `自動算 ${fmt(c.auto)}`;
+  $("lvMoreSum").textContent = [$("lvPayM").value ? `改到 ${payMonthLabel($("lvPayM").value, date)}` : "", $("lvDedIn").value !== "" ? `扣 ${fmt(+$("lvDedIn").value)}` : ""].filter(Boolean).join("、");
   const pm = $("lvPayM").value || autoPM;
   let txt = c.ded ? `這次會扣 <b>${fmt(c.ded)}</b> 元${c.manual ? "（你填的金額）" : ""}，扣在 ${payMonthLabel(pm, date)}的薪水` : "這次不會扣薪";
   if (c.capH !== Infinity) txt += `。${lead.name}${lead.id !== t.id ? "（合併）" : ""}今年到這次為止用了 ${fmtLv(c.usedAfter)}，上限 ${lead.limit} 天${c.overH ? `，<span class="uncat">其中 ${fmtLv(c.overH)} 超過上限</span>` : ""}`;
@@ -2621,8 +2620,8 @@ function openLeaveRec(r) {
   $("lvHours").value = r?.hours || 8;
   $("lvNote").value = r?.note || "";
   $("lvDedIn").value = r?.ded ?? "";
-  $("lvPayM").innerHTML = r?.payMonth ? `<option value="${r.payMonth}">${r.payMonth}</option>` : "";
   $("lvPayM").value = r?.payMonth || "";
+  $("lvMore").open = !!(r?.payMonth || (r?.ded != null && r?.ded !== ""));
   $("lvDel").classList.toggle("hidden", !r);
   lvChips();
   lvSync();
@@ -2632,6 +2631,7 @@ $("btnLvAdd").onclick = () => openLeaveRec();
 $("lvHourChips").querySelectorAll("button").forEach(b => b.onclick = () => { $("lvHours").value = b.dataset.h; lvSync(); });
 ["lvHours", "lvDate", "lvDedIn"].forEach(id => $(id).addEventListener("input", lvSync));
 $("lvPayM").addEventListener("change", lvSync);
+$("lvPayM").addEventListener("input", lvSync);
 $("lvCancel").onclick = () => $("dlgLeave").close();
 $("lvForm").onsubmit = async e => {
   e.preventDefault();
